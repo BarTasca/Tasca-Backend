@@ -1,0 +1,6 @@
+@BarTascaBackend_HostAddress = http://localhost:5260
+
+GET {{BarTascaBackend_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
