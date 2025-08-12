@@ -2,7 +2,7 @@
 using BarTasca.DTOs.Ticket;
 using TicketModel = BarTasca.Models.Ticket;
 
-namespace BarTasca.DTOs.Mapping;
+namespace BarTasca.Services.Mapping;
 
 public class TicketMappingProfile : Profile
 {
