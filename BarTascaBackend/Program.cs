@@ -1,13 +1,7 @@
 using BarTasca.Data;
 using Microsoft.EntityFrameworkCore;
 using DotNetEnv;
-using AutoMapper;
-//using BarTasca.Services;
-//using BarTasca.Services.Interfaces;
-//using BarTasca.Data.Repositories;
-//using BarTasca.Data.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
-
 
 // Cargar .env
 DotNetEnv.Env.Load();
@@ -26,9 +20,6 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-//// AutoMapper
-//builder.Services.AddAutoMapper(typeof(Program));
-
 // DbContext con MySQL desde variable de entorno
 var connectionString = $"Server={Environment.GetEnvironmentVariable("MYSQL_HOST")};" +
                        $"Port={Environment.GetEnvironmentVariable("MYSQL_PORT")};" +
@@ -36,7 +27,7 @@ var connectionString = $"Server={Environment.GetEnvironmentVariable("MYSQL_HOST"
                        $"Uid={Environment.GetEnvironmentVariable("MYSQL_USER")};" +
                        $"Pwd={Environment.GetEnvironmentVariable("MYSQL_PASSWORD")};";
 
-if(string.IsNullOrEmpty(connectionString))
+if (string.IsNullOrWhiteSpace(connectionString))
 {
     throw new InvalidOperationException("La cadena de conexión a la base de datos no está configurada correctamente.");
 }
@@ -47,10 +38,8 @@ builder.Services.AddDbContext<ColaDbContext>(options =>
 // SignalR (placeholder para más adelante)
 builder.Services.AddSignalR();
 
-//// Repositorios e interfaces
-//builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
-//builder.Services.AddScoped<ITicketRepository, TicketRepository>();
-//builder.Services.AddScoped<INotificationService, NotificationService>();
+// Repositorios (Data)
+builder.Services.AddRepositories();
 
 var app = builder.Build();
 
@@ -66,6 +55,6 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.MapControllers();
-//app.MapHub<QueueHub>("/queueHub"); // <- cuando tengas el Hub
+// app.MapHub<QueueHub>("/queueHub"); // <- cuando tengas el Hub
 
 app.Run();
