@@ -1,12 +1,20 @@
 ﻿using AutoMapper;
-using static System.Runtime.InteropServices.JavaScript.JSType;
+using BarTasca.DTOs.Ticket;
+using TicketModel = BarTasca.Models.Ticket;
 
-namespace BarTasca.Services.Mapping;
+namespace BarTasca.DTOs.Mapping;
 
-public class TicketProfile : Profile
+public class TicketMappingProfile : Profile
 {
-    public TicketProfile()
+    public TicketMappingProfile()
     {
-        // TODO: mapear Ticket <-> TicketDto
+        CreateMap<TicketModel, TicketDetailDto>()
+            .ForMember(d => d.Status, m => m.MapFrom(s => s.Status.ToString()))
+            .ForMember(d => d.CustomerFullName, m => m.MapFrom(s => s.Customer.FullName))
+            .ForMember(d => d.Ahead, m => m.Ignore()); // lo calcula el servicio
+
+        CreateMap<TicketModel, TicketCompactDto>()
+            .ForMember(d => d.Status, m => m.MapFrom(s => s.Status.ToString()))
+            .ForMember(d => d.Ahead, m => m.Ignore());
     }
 }

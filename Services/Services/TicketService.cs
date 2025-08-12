@@ -28,9 +28,9 @@ public class TicketService : ITicketService
         {
             var aheadExisting = await _tickets.CountAheadAsync(existingActive.Id, ct);
             var dtoExisting = _mapper.Map<TicketDetailDto>(existingActive);
-            //dtoExisting.Ahead = aheadExisting;
+            dtoExisting.Ahead = aheadExisting;
             // No exponer nombre del cliente en DTO público
-            //dtoExisting.CustomerFullName = string.Empty;
+            dtoExisting.CustomerFullName = string.Empty;
             return dtoExisting;
         }
 
@@ -64,9 +64,9 @@ public class TicketService : ITicketService
 
         var ahead = await _tickets.CountAheadAsync(ticket.Id, ct);
         var result = _mapper.Map<TicketDetailDto>(ticket);
-        //result.Ahead = ahead;
+        result.Ahead = ahead;
         // No exponer nombre del cliente en DTO público
-        //result.CustomerFullName = string.Empty;
+        result.CustomerFullName = string.Empty;
         return result;
     }
 
@@ -77,9 +77,9 @@ public class TicketService : ITicketService
 
         var ahead = await _tickets.CountAheadAsync(ticket.Id, ct);
         var dto = _mapper.Map<TicketDetailDto>(ticket);
-        //dto.Ahead = ahead;
+        dto.Ahead = ahead;
         // No exponer nombre del cliente en DTO público
-        //dto.CustomerFullName = string.Empty;
+        dto.CustomerFullName = string.Empty;
         return dto;
     }
 }
