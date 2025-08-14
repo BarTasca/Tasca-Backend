@@ -1,7 +1,10 @@
 using BarTasca.Data;
 using Microsoft.EntityFrameworkCore;
 using DotNetEnv;
-using Microsoft.Extensions.DependencyInjection;
+using BarTasca.Services.Mapping;
+using AutoMapper;
+using BarTasca.Services;
+using BarTascaBackend;
 
 // Cargar .env
 DotNetEnv.Env.Load();
@@ -13,14 +16,10 @@ builder.WebHost.ConfigureKestrel(serverOptions =>
     serverOptions.ListenAnyIP(8080);
 });
 
-// Add services to the container.
-builder.Services.AddControllers();
+// API (controllers + swagger + signalR)
+builder.Services.AddApiLayer();
 
-// Swagger
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
-// DbContext con MySQL desde variable de entorno
+// DbContext con MySQL desde variables de entorno
 var connectionString = $"Server={Environment.GetEnvironmentVariable("MYSQL_HOST")};" +
                        $"Port={Environment.GetEnvironmentVariable("MYSQL_PORT")};" +
                        $"Database={Environment.GetEnvironmentVariable("MYSQL_DB")};" +
@@ -28,18 +27,19 @@ var connectionString = $"Server={Environment.GetEnvironmentVariable("MYSQL_HOST"
                        $"Pwd={Environment.GetEnvironmentVariable("MYSQL_PASSWORD")};";
 
 if (string.IsNullOrWhiteSpace(connectionString))
-{
     throw new InvalidOperationException("La cadena de conexión a la base de datos no está configurada correctamente.");
-}
 
 builder.Services.AddDbContext<ColaDbContext>(options =>
     options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
-// SignalR (placeholder para más adelante)
-builder.Services.AddSignalR();
-
 // Repositorios (Data)
 builder.Services.AddRepositories();
+
+// AutoMapper (si tu Profile está en DTOs/Mapping como hasta ahora)
+builder.Services.AddAutoMapper(cfg => cfg.AddProfile<TicketMappingProfile>());
+
+// Servicios de aplicación (Services)
+builder.Services.AddApplicationServices();
 
 var app = builder.Build();
 
@@ -51,10 +51,9 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
-
 app.UseAuthorization();
 
 app.MapControllers();
-// app.MapHub<QueueHub>("/queueHub"); // <- cuando tengas el Hub
+// app.MapHub<QueueHub>("/queueHub");
 
 app.Run();

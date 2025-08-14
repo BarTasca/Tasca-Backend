@@ -12,6 +12,7 @@
         public DateTime? ConfirmedAt { get; init; }
         public DateTime? ExpiresAt { get; init; }
 
-        public string CustomerFullName { get; init; } = string.Empty;
+        public int Ahead { get; set; }
+        public string CustomerFullName { get; set; } = string.Empty;
     }
 }
