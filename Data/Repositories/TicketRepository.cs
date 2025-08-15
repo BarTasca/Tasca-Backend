@@ -53,4 +53,13 @@ public class TicketRepository : ITicketRepository
 
     public Task<int> SaveChangesAsync(CancellationToken ct = default)
         => _db.SaveChangesAsync(ct);
+
+    public Task<List<Ticket>> ListByStatusesAsync(TicketStatus[] statuses, int take = 100, CancellationToken ct = default)
+        => _db.Tickets
+              .AsNoTracking()
+              .Include(t => t.Customer)
+              .Where(t => statuses.Contains(t.Status))
+              .OrderBy(t => t.Position)
+              .Take(take)
+              .ToListAsync(ct);
 }
