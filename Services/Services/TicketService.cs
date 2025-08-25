@@ -11,12 +11,14 @@ public class TicketService : ITicketService
     private readonly ICustomerRepository _customers;
     private readonly ITicketRepository _tickets;
     private readonly IMapper _mapper;
+    private readonly INotificationService _notificationService;
 
-    public TicketService(ICustomerRepository customers, ITicketRepository tickets, IMapper mapper)
+    public TicketService(ICustomerRepository customers, ITicketRepository tickets, IMapper mapper, INotificationService notificationService)
     {
         _customers = customers;
         _tickets = tickets;
         _mapper = mapper;
+        _notificationService = notificationService;
     }
 
     public async Task<TicketDetailDto> CreateAsync(CreateTicketDto dto, CancellationToken ct = default)
@@ -50,10 +52,15 @@ public class TicketService : ITicketService
             Status = TicketStatus.Waiting
         };
 
+        ticket.Customer = customer;
+
         await _tickets.AddAsync(ticket, ct);
         await _tickets.SaveChangesAsync(ct);
 
         var ahead = await _tickets.CountAheadAsync(ticket.Id, ct);
+
+        await _notificationService.NotifyTicketCreatedAsync(ticket, ahead, ct);
+
         var result = _mapper.Map<TicketDetailDto>(ticket);
         result.Ahead = ahead;
         result.CustomerFullName = string.Empty;
@@ -123,6 +130,42 @@ public class TicketService : ITicketService
         }
 
         var ahead = await _tickets.CountAheadAsync(ticket.Id, ct);
+
+        await _notificationService.NotifyTicketUpdatedAsync(ticket, ahead, ct);
+
+        var dto = _mapper.Map<TicketDetailDto>(ticket);
+        dto.Ahead = ahead;
+        dto.CustomerFullName = string.Empty;
+        return dto;
+    }
+
+    public async Task<TicketDetailDto?> NotifyAsync(int id, bool force = false, CancellationToken ct = default)
+    {
+        var ticket = await _tickets.GetByIdAsync(id, ct);
+        if (ticket is null) return null;
+
+        var isTerminal = ticket.Status is TicketStatus.Confirmed or TicketStatus.Skipped or TicketStatus.Cancelled;
+        if (isTerminal) throw new InvalidOperationException($"Invalid transition from {ticket.Status} to Notified");
+
+        if (ticket.Status == TicketStatus.Notified && !force)
+        {
+            var ahead0 = await _tickets.CountAheadAsync(ticket.Id, ct);
+            var dto0 = _mapper.Map<TicketDetailDto>(ticket);
+            dto0.Ahead = ahead0;
+            dto0.CustomerFullName = string.Empty;
+            return dto0;
+        }
+
+        ticket.Status = TicketStatus.Notified;
+        ticket.NotifiedAt = DateTime.UtcNow;
+        ticket.ExpiresAt = ticket.NotifiedAt.Value.AddMinutes(5);
+
+        _tickets.Update(ticket);
+        await _tickets.SaveChangesAsync(ct);
+
+        var ahead = await _tickets.CountAheadAsync(ticket.Id, ct);
+        await _notificationService.NotifyTicketUpdatedAsync(ticket, ahead, ct);
+
         var dto = _mapper.Map<TicketDetailDto>(ticket);
         dto.Ahead = ahead;
         dto.CustomerFullName = string.Empty;

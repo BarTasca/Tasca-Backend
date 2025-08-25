@@ -24,6 +24,10 @@ TestResults/
 logs/
 /*.log
 
-/.env
-.env.local
-.env.*.local*.patch
+**/.env
+.env
+.env.*
+!.env.example
+
+
+wwwroot/

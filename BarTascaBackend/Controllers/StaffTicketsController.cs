@@ -63,4 +63,19 @@ public class StaffTicketsController : ControllerBase
             return Conflict(new { error = ex.Message });
         }
     }
+
+    [HttpPost("{id:int}/notify")]
+    public async Task<ActionResult<TicketDetailDto>> Notify(int id, [FromQuery] bool force = false, CancellationToken ct = default)
+    {
+        try
+        {
+            var result = await _service.NotifyAsync(id, force, ct);
+            if (result is null) return NotFound();
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+    }
 }
