@@ -54,4 +54,14 @@ public interface ITicketService
     /// <param name="ct">Cancellation token.</param>
     /// <returns>List of tickets for staff.</returns>
     Task<IReadOnlyList<TicketStaffListDto>> ListForStaffAsync(string status = "active", int take = 100, CancellationToken ct = default);
+
+    /// <summary>
+    /// Notifies the customer of a ticket, optionally forcing the notification.
+    /// </summary>
+    /// <param name="id">Ticket ID.</param>
+    /// <param name="force">If true, forces the notification even if it has already been notified.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Updated ticket details or null if not found.</returns>
+    Task<TicketDetailDto?> NotifyAsync(int id, bool force = false, CancellationToken ct = default);
+
 }

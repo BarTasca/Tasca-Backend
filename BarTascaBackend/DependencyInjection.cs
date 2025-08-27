@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using BarTascaBackend.Background;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace BarTascaBackend;
 
@@ -9,7 +10,13 @@ public static class DependencyInjection
         services.AddControllers();
         services.AddEndpointsApiExplorer();
         services.AddSwaggerGen();
-        services.AddSignalR(); // el Hub se mapeará en Program.cs cuando lo tengas
+        services.AddSignalR();
+        return services;
+    }
+
+    public static IServiceCollection AddBackgroundWorkers(this IServiceCollection services)
+    {
+        services.AddHostedService<NotificationHostedService>();
         return services;
     }
 }
