@@ -13,7 +13,6 @@ DotNetEnv.Env.Load();
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(o => o.ListenAnyIP(8080));
 
-builder.Services.AddApiLayer();
 
 // DbContext
 var connectionString =
@@ -33,9 +32,13 @@ builder.Services.AddRepositories();
 builder.Services.AddAutoMapper(cfg => cfg.AddProfile<TicketMappingProfile>());
 builder.Services.AddApplicationServices();
 
-// SignalR + Infrastructure (inyecta el Hub real que usará el notifier)
+// SignalR + Infrastructure
+builder.Services.AddApiLayer();
 builder.Services.AddSignalR();
-builder.Services.AddInfrastructure<QueueHub>(); // <--- aquí se resuelve INotificationService
+builder.Services.AddInfrastructure<QueueHub>();
+
+//Workers
+builder.Services.AddBackgroundWorkers();
 
 var app = builder.Build();
 
