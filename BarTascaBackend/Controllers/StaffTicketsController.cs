@@ -1,11 +1,13 @@
 ﻿using BarTasca.DTOs.Ticket;
 using BarTasca.Services.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace BarTascaBackend.Controllers;
 
 [ApiController]
 [Route("api/staff/tickets")]
+[Authorize(Roles = "Admin,Waiter")]
 public class StaffTicketsController : ControllerBase
 {
     private readonly ITicketService _service;
