@@ -63,4 +63,14 @@ public interface ITicketRepository
     /// <param name="ct">Cancellation token.</param>
     /// <returns>List of tickets matching the statuses.</returns>
     Task<List<Ticket>> ListByStatusesAsync(TicketStatus[] statuses, int take = 100, CancellationToken ct = default);
+
+    /// <summary>
+    /// Lists active tickets (Waiting/Notified) behind a certain position.
+    /// </summary>
+    /// <param name="position"></param>
+    /// <param name="take"></param>
+    /// <param name="ct"></param>
+    /// <returns></returns>
+    Task<List<Ticket>> ListActiveBehindAsync(int position, int take, CancellationToken ct = default);
+
 }

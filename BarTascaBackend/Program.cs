@@ -1,39 +1,62 @@
+using System.Text;
 using BarTasca.Data;
-using BarTasca.Data.Interfaces;
 using BarTasca.Infrastructure;
 using BarTasca.Services;
 using BarTasca.Services.Mapping;
-using BarTasca.Services.Services;
-using BarTasca.Services.Interfaces;
+using BarTasca.Services.Options;
 using BarTascaBackend;
 using BarTascaBackend.Hubs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
+using Microsoft.OpenApi.Models;
 
-DotNetEnv.Env.Load();
+
+try
+{
+    DotNetEnv.Env.Load();
+}
+catch
+{
+    throw new InvalidOperationException("Error loading environment variables from .env file");
+}
 
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(o => o.ListenAnyIP(8080));
 
-// Jwt config (fuente única)
-var jwtSecret = Environment.GetEnvironmentVariable("JWT_SECRET") ?? throw new InvalidOperationException("JWT_SECRET not set");
-var jwtIssuer = Environment.GetEnvironmentVariable("JWT_ISSUER") ?? throw new InvalidOperationException("JWT_ISSUER not set");
-var jwtAudience = Environment.GetEnvironmentVariable("JWT_AUDIENCE") ?? throw new InvalidOperationException("JWT_AUDIENCE not set");
+static string EnvOrThrow(string key) =>
+    Environment.GetEnvironmentVariable(key)
+    ?? throw new InvalidOperationException($"{key} not set");
+
+// Jwt config
+var jwt = new JwtOptions
+{
+    Secret = EnvOrThrow("JWT_SECRET"),
+    Issuer = EnvOrThrow("JWT_ISSUER"),
+    Audience = EnvOrThrow("JWT_AUDIENCE"),
+    ExpiresHours = 24
+};
+
+builder.Services.AddSingleton<IOptions<JwtOptions>>(Options.Create(jwt));
+var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Secret));
+
 
 // Autenticación JWT
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(JwtBearerDefaults.AuthenticationScheme, options =>
     {
+        options.RequireHttpsMetadata = !builder.Environment.IsDevelopment();
+
         options.TokenValidationParameters = new TokenValidationParameters
         {
             ValidateIssuer = true,
             ValidateAudience = true,
             ValidateLifetime = true,
             ValidateIssuerSigningKey = true,
-            ValidIssuer = jwtIssuer,
-            ValidAudience = jwtAudience,
-            IssuerSigningKey = new SymmetricSecurityKey(System.Text.Encoding.UTF8.GetBytes(jwtSecret)),
+            ValidIssuer = jwt.Issuer,
+            ValidAudience = jwt.Audience,
+            IssuerSigningKey = signingKey,
             ClockSkew = TimeSpan.Zero
         };
 
@@ -54,20 +77,13 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
         };
     });
 
-builder.Services.AddAuthorization(options =>
-{
-    options.AddPolicy("VeteranOnly", policy => policy.RequireClaim("IsVeteran", "True"));
-});
-
 // DbContext
 var connectionString =
-    $"Server={Environment.GetEnvironmentVariable("MYSQL_HOST")};" +
-    $"Port={Environment.GetEnvironmentVariable("MYSQL_PORT")};" +
-    $"Database={Environment.GetEnvironmentVariable("MYSQL_DB")};" +
-    $"Uid={Environment.GetEnvironmentVariable("MYSQL_USER")};" +
-    $"Pwd={Environment.GetEnvironmentVariable("MYSQL_PASSWORD")};";
-if (string.IsNullOrWhiteSpace(connectionString))
-    throw new InvalidOperationException("DB connection string not configured.");
+    $"Server={EnvOrThrow("MYSQL_HOST")};" +
+    $"Port={EnvOrThrow("MYSQL_PORT")};" +
+    $"Database={EnvOrThrow("MYSQL_DB")};" +
+    $"Uid={EnvOrThrow("MYSQL_USER")};" +
+    $"Pwd={EnvOrThrow("MYSQL_PASSWORD")};";
 
 builder.Services.AddDbContext<ColaDbContext>(opt =>
     opt.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
@@ -76,16 +92,12 @@ builder.Services.AddDbContext<ColaDbContext>(opt =>
 builder.Services.AddRepositories();
 builder.Services.AddAutoMapper(cfg => cfg.AddProfile<TicketMappingProfile>());
 builder.Services.AddApplicationServices();
-builder.Services.AddScoped<IStaffAuthService>(sp =>
-{
-    var repo = sp.GetRequiredService<IStaffUserRepository>();
-    return new StaffAuthService(repo, jwtSecret, jwtIssuer, jwtAudience);
-});
 
 // SignalR + Infrastructure
 builder.Services.AddApiLayer();
 builder.Services.AddSignalR();
 builder.Services.AddInfrastructure<QueueHub>();
+
 
 //Workers
 builder.Services.AddBackgroundWorkers();

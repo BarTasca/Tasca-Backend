@@ -18,5 +18,12 @@ namespace BarTascaBackend.Controllers
             if (res is null) return Unauthorized(new { error = "Invalid credentials" });
             return Ok(res);
         }
+
+        [HttpGet("hash")]
+        public IActionResult GetHash(string password)
+        {
+            var hash = BCrypt.Net.BCrypt.HashPassword(password);
+            return Ok(hash);
+        }
     }
 }

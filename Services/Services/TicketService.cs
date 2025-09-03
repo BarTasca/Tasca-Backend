@@ -60,6 +60,18 @@ public class TicketService : ITicketService
         var ahead = await _tickets.CountAheadAsync(ticket.Id, ct);
 
         await _notificationService.NotifyTicketCreatedAsync(ticket, ahead, ct);
+        if (ahead <= 3 && ahead > 1)
+        {
+            await _notificationService.NotifyTicketUpdatedAsync(ticket, ahead, NotificationType.Reminder, ct);
+        }
+        if (ahead <= 1)
+        {
+            ticket.Status = TicketStatus.Notified;
+            ticket.NotifiedAt = DateTime.UtcNow;
+            _tickets.Update(ticket);
+            await _tickets.SaveChangesAsync(ct);
+            await _notificationService.NotifyTicketUpdatedAsync(ticket, ahead, NotificationType.Turn, ct);
+        }
 
         var result = _mapper.Map<TicketDetailDto>(ticket);
         result.Ahead = ahead;
@@ -129,12 +141,44 @@ public class TicketService : ITicketService
             await _tickets.SaveChangesAsync(ct);
         }
 
-        var ahead = await _tickets.CountAheadAsync(ticket.Id, ct);
+        var aheadSelf = await _tickets.CountAheadAsync(ticket.Id, ct);
+        await _notificationService.BroadcastTicketUpdatedAsync(ticket, aheadSelf, ct);
 
-        await _notificationService.NotifyTicketUpdatedAsync(ticket, ahead, ct);
+        var affected = await _tickets.ListActiveBehindAsync(ticket.Position, 500, ct);
+        foreach (var a in affected)
+        {
+            var afterAhead = await _tickets.CountAheadAsync(a.Id, ct);
+            var previousAhead = afterAhead + 1;
+
+            if (previousAhead > 3 && afterAhead == 3)
+            {
+                await _notificationService.NotifyTicketUpdatedAsync(a, afterAhead, NotificationType.Reminder, ct);
+            }
+            else if (previousAhead > 1 && afterAhead <= 1)
+            {
+                var toUpdate = await _tickets.GetByIdAsync(a.Id, ct);
+                if (toUpdate is not null)
+                {
+                    if (toUpdate.Status != TicketStatus.Notified)
+                    {
+                        toUpdate.Status = TicketStatus.Notified;
+                        toUpdate.NotifiedAt = DateTime.UtcNow;
+                        _tickets.Update(toUpdate);
+                        await _tickets.SaveChangesAsync(ct);
+                    }
+
+                    var finalAhead = await _tickets.CountAheadAsync(toUpdate.Id, ct);
+                    await _notificationService.NotifyTicketUpdatedAsync(toUpdate, finalAhead, NotificationType.Turn, ct);
+                }
+            }
+            else
+            {
+                await _notificationService.BroadcastTicketUpdatedAsync(a, afterAhead, ct);
+            }
+        }
 
         var dto = _mapper.Map<TicketDetailDto>(ticket);
-        dto.Ahead = ahead;
+        dto.Ahead = aheadSelf;
         dto.CustomerFullName = string.Empty;
         return dto;
     }
@@ -158,13 +202,12 @@ public class TicketService : ITicketService
 
         ticket.Status = TicketStatus.Notified;
         ticket.NotifiedAt = DateTime.UtcNow;
-        ticket.ExpiresAt = ticket.NotifiedAt.Value.AddMinutes(5);
 
         _tickets.Update(ticket);
         await _tickets.SaveChangesAsync(ct);
 
         var ahead = await _tickets.CountAheadAsync(ticket.Id, ct);
-        await _notificationService.NotifyTicketUpdatedAsync(ticket, ahead, ct);
+        await _notificationService.NotifyTicketUpdatedAsync(ticket, ahead, NotificationType.Manual, ct);
 
         var dto = _mapper.Map<TicketDetailDto>(ticket);
         dto.Ahead = ahead;
