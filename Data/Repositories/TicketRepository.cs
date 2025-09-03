@@ -26,7 +26,7 @@ public class TicketRepository : ITicketRepository
     public async Task<int> GetMaxWaitingPositionAsync(CancellationToken ct = default)
     {
         var max = await _db.Tickets
-                           .Where(t => t.Status == TicketStatus.Waiting)
+                           .Where(t => t.Status == TicketStatus.Waiting || t.Status == TicketStatus.Notified)
                            .Select(t => (int?)t.Position)
                            .MaxAsync(ct);
         return max ?? 0;
@@ -55,11 +55,26 @@ public class TicketRepository : ITicketRepository
         => _db.SaveChangesAsync(ct);
 
     public Task<List<Ticket>> ListByStatusesAsync(TicketStatus[] statuses, int take = 100, CancellationToken ct = default)
-        => _db.Tickets
+    {
+        return _db.Tickets
               .AsNoTracking()
               .Include(t => t.Customer)
               .Where(t => statuses.Contains(t.Status))
               .OrderBy(t => t.Position)
               .Take(take)
               .ToListAsync(ct);
+    }
+
+    public Task<List<Ticket>> ListActiveBehindAsync(int position, int take, CancellationToken ct = default)
+    {
+        return _db.Tickets
+            .AsNoTracking()
+            .Include(t => t.Customer)
+            .Where(t =>
+                (t.Status == TicketStatus.Waiting || t.Status == TicketStatus.Notified) &&
+                t.Position > position)
+            .OrderBy(t => t.Position)
+            .Take(take)
+            .ToListAsync(ct);
+    }
 }

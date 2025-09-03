@@ -6,8 +6,8 @@ using Microsoft.AspNetCore.Mvc;
 namespace BarTascaBackend.Controllers;
 
 [ApiController]
-[Route("api/staff/tickets")]
 [Authorize(Roles = "Admin,Waiter")]
+[Route("api/staff/tickets")]
 public class StaffTicketsController : ControllerBase
 {
     private readonly ITicketService _service;
@@ -67,7 +67,7 @@ public class StaffTicketsController : ControllerBase
     }
 
     [HttpPost("{id:int}/notify")]
-    public async Task<ActionResult<TicketDetailDto>> Notify(int id, [FromQuery] bool force = false, CancellationToken ct = default)
+    public async Task<ActionResult<TicketDetailDto>> Notify(int id, [FromQuery] bool force = true, CancellationToken ct = default)
     {
         try
         {

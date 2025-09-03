@@ -17,8 +17,9 @@ public enum NotificationChannel
 
 public enum NotificationType
 {
-    Reminder,
-    Alert
+    Reminder = 1,
+    Turn = 2,
+    Manual = 3
 }
 
 public enum NotificationStatus

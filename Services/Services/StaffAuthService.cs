@@ -6,22 +6,20 @@ using BarTasca.Models;
 using BarTasca.Services.Interfaces;
 using Microsoft.IdentityModel.Tokens;
 using System.IdentityModel.Tokens.Jwt;
+using Microsoft.Extensions.Options;
+using BarTasca.Services.Options;
 
 namespace BarTasca.Services.Services
 {
     public class StaffAuthService : IStaffAuthService
     {
         private readonly IStaffUserRepository _repo;
-        private readonly string _jwtSecret;
-        private readonly string _jwtIssuer;
-        private readonly string _jwtAudience;
+        private readonly JwtOptions _jwt;
 
-        public StaffAuthService(IStaffUserRepository repo, string jwtSecret, string jwtIssuer, string jwtAudience)
+        public StaffAuthService(IStaffUserRepository repo, IOptions<JwtOptions> jwt)
         {
             _repo = repo;
-            _jwtSecret = jwtSecret ?? throw new InvalidOperationException("JWT_SECRET not set");
-            _jwtIssuer = jwtIssuer ?? "BarTasca";
-            _jwtAudience = jwtAudience ?? "BarTasca.Client";
+            _jwt = jwt?.Value ?? throw new InvalidOperationException("Jwt options not set");
         }
 
         public async Task<LoginResponseDto?> LoginAsync(LoginRequestDto dto, CancellationToken ct = default)
@@ -31,7 +29,7 @@ namespace BarTasca.Services.Services
 
             if (!VerifyPassword(dto.Password, user.PasswordHash)) return null;
 
-            var expires = DateTime.UtcNow.AddHours(24);
+            var expires = DateTime.UtcNow.AddHours(_jwt.ExpiresHours);
             var token = CreateJwt(user, expires);
 
             return new LoginResponseDto
@@ -50,7 +48,7 @@ namespace BarTasca.Services.Services
 
         private string CreateJwt(StaffUser user, DateTime expiresUtc)
         {
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwtSecret));
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_jwt.Secret));
             var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
             var claims = new[]
@@ -61,8 +59,8 @@ namespace BarTasca.Services.Services
             };
 
             var token = new JwtSecurityToken(
-                issuer: _jwtIssuer,
-                audience: _jwtAudience,
+                issuer: _jwt.Issuer,
+                audience: _jwt.Audience,
                 claims: claims,
                 expires: expiresUtc,
                 signingCredentials: creds);

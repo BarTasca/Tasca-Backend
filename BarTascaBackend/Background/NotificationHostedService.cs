@@ -13,10 +13,8 @@ public class NotificationHostedService : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly ILogger<NotificationHostedService> _logger;
 
-    // Evita re-enviar continuamente el aviso de "es tu turno" (ahead == 1) en NOTIFIED
     private readonly ConcurrentDictionary<int, int> _lastAheadSent = new();
 
-    // Periodicidad del ciclo
     private static readonly TimeSpan _interval = TimeSpan.FromSeconds(30);
 
     public NotificationHostedService(IServiceScopeFactory scopeFactory, ILogger<NotificationHostedService> logger)
@@ -36,6 +34,7 @@ public class NotificationHostedService : BackgroundService
                 using var scope = _scopeFactory.CreateScope();
                 var ticketsRepo = scope.ServiceProvider.GetRequiredService<ITicketRepository>();
                 var notifier = scope.ServiceProvider.GetRequiredService<INotificationService>();
+                var notificationsRepo = scope.ServiceProvider.GetRequiredService<INotificationRepository>();
 
                 // 1) Traer tickets relevantes: Waiting + Notified (activos)
                 var activeStatuses = new[] { TicketStatus.Waiting, TicketStatus.Notified };
@@ -46,36 +45,60 @@ public class NotificationHostedService : BackgroundService
                     // Recalcular ahead en cada iteración
                     var ahead = await ticketsRepo.CountAheadAsync(t.Id, stoppingToken);
 
-                    if (t.Status == TicketStatus.Waiting)
+                    // === Solo respaldo para TURN (ahead == 1) ===
+                    // Sin Reminder aquí. Nada para ahead == 3.
+
+                    // Caso A: ticket en Waiting y entra a TURN (ahead == 1)
+                    if (t.Status == TicketStatus.Waiting && ahead == 1)
                     {
-                        // Regla 1: Waiting y ahead == 3 => Notified + NotifiedAt (quedan 3 por delante)
-                        if (ahead == 3)
+                        // Deduplicar: si ya se envió TURN, saltar
+                        var alreadySent = await notificationsRepo.ExistsSentAsync(t.Id, NotificationType.Turn, stoppingToken);
+                        if (!alreadySent)
                         {
+                            // Promocionar a Notified y persistir antes de notificar
                             t.Status = TicketStatus.Notified;
                             t.NotifiedAt = DateTime.UtcNow;
                             ticketsRepo.Update(t);
                             await ticketsRepo.SaveChangesAsync(stoppingToken);
 
-                            // Emitimos 'ticketUpdated' (el cliente verá cambio a Notified)
-                            await notifier.NotifyTicketUpdatedAsync(t, ahead, stoppingToken);
+                            // Notificar TURN
+                            await notifier.NotifyTicketUpdatedAsync(t, ahead, NotificationType.Turn, stoppingToken);
 
-                            // Reset de memoria para no disparar "turno" inmediatamente si el cálculo cambia
-                            _lastAheadSent.TryRemove(t.Id, out _);
-                        }
-                    }
-                    else if (t.Status == TicketStatus.Notified)
-                    {
-                        // Regla 2: Notified y ahead == 1 => enviar aviso ("es tu turno"), sin cambiar estado
-                        var previous = _lastAheadSent.GetOrAdd(t.Id, int.MaxValue);
-                        if (ahead == 1 && previous != 1)
-                        {
-                            // No cambiamos estado; re-emitimos 'ticketUpdated' para notificar al cliente/staff
-                            await notifier.NotifyTicketUpdatedAsync(t, ahead, stoppingToken);
+                            // Sincronizar memoria para no reemitir en siguiente ciclo
                             _lastAheadSent[t.Id] = 1;
                         }
+                        else
+                        {
+                            // Ya enviado; sincronizar memoria igualmente
+                            _lastAheadSent[t.Id] = 1;
+                        }
+                    }
+                    // Caso B: ticket ya Notified y se mantiene/entra en TURN (ahead == 1)
+                    else if (t.Status == TicketStatus.Notified)
+                    {
+                        var previous = _lastAheadSent.GetOrAdd(t.Id, int.MaxValue);
 
-                        // Si vuelve a crecer la cola o cambia, actualizamos memoria para futuros envíos
-                        if (ahead != 1)
+                        if (ahead == 1 && previous != 1)
+                        {
+                            // Deduplicar antes de reemitir
+                            var alreadySent = await notificationsRepo.ExistsSentAsync(t.Id, NotificationType.Turn, stoppingToken);
+                            if (!alreadySent)
+                            {
+                                await notifier.NotifyTicketUpdatedAsync(t, ahead, NotificationType.Turn, stoppingToken);
+                            }
+                            _lastAheadSent[t.Id] = 1;
+                        }
+                        else if (ahead != 1)
+                        {
+                            // Si cambia el ahead, sincronizamos memoria para futuras transiciones a 1
+                            _lastAheadSent[t.Id] = ahead;
+                        }
+                    }
+                    else
+                    {
+                        // Otros casos (Waiting con ahead != 1): no hacer nada aquí.
+                        // Este HostedService es solo respaldo para TURN.
+                        if (t.Status == TicketStatus.Waiting && ahead != 1)
                         {
                             _lastAheadSent[t.Id] = ahead;
                         }
