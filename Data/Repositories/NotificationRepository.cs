@@ -12,11 +12,23 @@ public class NotificationRepository : INotificationRepository
     public Task AddAsync(Notification notification, CancellationToken ct = default)
         => _db.Notifications.AddAsync(notification, ct).AsTask();
 
-    public Task<bool> ExistsSentAsync(int ticketId, NotificationType type, CancellationToken ct = default)
-        => _db.Notifications.AnyAsync(n =>
+    public Task<bool> ExistsSentAsync(int ticketId, NotificationType type, NotificationChannel channel, CancellationToken ct = default)
+    => _db.Notifications.AnyAsync(n =>
+        n.TicketId == ticketId &&
+        n.Type == type &&
+        n.Channel == channel &&
+        n.Status == NotificationStatus.Sent, ct);
+
+    public Task<bool> WasSentRecentlyAsync(int ticketId, NotificationType type, NotificationChannel channel, TimeSpan window, CancellationToken ct = default)
+    {
+        var cutoff = DateTime.UtcNow - window;
+        return _db.Notifications.AnyAsync(n =>
             n.TicketId == ticketId &&
             n.Type == type &&
-            n.Status == NotificationStatus.Sent, ct);
+            n.Channel == channel &&
+            n.Status == NotificationStatus.Sent &&
+            n.SentAt >= cutoff, ct);
+    }
 
     public Task<int> SaveChangesAsync(CancellationToken ct = default)
         => _db.SaveChangesAsync(ct);

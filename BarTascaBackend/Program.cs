@@ -4,6 +4,7 @@ using BarTasca.Infrastructure;
 using BarTasca.Services;
 using BarTasca.Services.Mapping;
 using BarTasca.Services.Options;
+using BarTasca.Infrastructure.Options;
 using BarTascaBackend;
 using BarTascaBackend.Hubs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -41,6 +42,19 @@ var jwt = new JwtOptions
 builder.Services.AddSingleton<IOptions<JwtOptions>>(Options.Create(jwt));
 var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Secret));
 
+var twilio = new TwilioOptions
+{
+    Sid = EnvOrThrow("TWILIO_SID"),
+    Token = EnvOrThrow("TWILIO_TOKEN"),
+    From = EnvOrThrow("TWILIO_FROM"),
+};
+
+builder.Services.AddSingleton<IOptions<TwilioOptions>>(Options.Create(twilio));
+
+if (twilio.Enabled)
+{
+    Twilio.TwilioClient.Init(twilio.Sid!, twilio.Token!);
+}
 
 // Autenticación JWT
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -86,7 +100,7 @@ var connectionString =
     $"Pwd={EnvOrThrow("MYSQL_PASSWORD")};";
 
 builder.Services.AddDbContext<ColaDbContext>(opt =>
-    opt.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
+    opt.UseMySql(connectionString, new MySqlServerVersion(new Version(8, 0, 36))));
 
 // Repos y servicios de aplicación
 builder.Services.AddRepositories();
