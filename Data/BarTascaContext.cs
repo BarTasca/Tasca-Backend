@@ -34,12 +34,15 @@ public class ColaDbContext : DbContext
             .HasForeignKey(n => n.TicketId)
             .OnDelete(DeleteBehavior.Cascade);
 
-        // 🔒 Índice único teléfono
+        modelBuilder.Entity<Notification>()
+            .HasIndex(n => new { n.TicketId, n.Type, n.Channel, n.Status, n.SentAt });
+
+        // Índice único teléfono
         modelBuilder.Entity<Customer>()
             .HasIndex(c => c.Phone)
             .IsUnique();
 
-        // ⚡ Índice para cálculo de cola
+        // Índice para cálculo de cola
         modelBuilder.Entity<Ticket>()
             .HasIndex(t => new { t.Status, t.Position });
     }
