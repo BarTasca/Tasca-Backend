@@ -49,8 +49,7 @@ var jwt = new JwtOptions
 {
     Secret = EnvOrThrow("JWT_SECRET"),
     Issuer = EnvOrThrow("JWT_ISSUER"),
-    Audience = EnvOrThrow("JWT_AUDIENCE"),
-    ExpiresHours = 24
+    Audience = EnvOrThrow("JWT_AUDIENCE")
 };
 
 builder.Services.AddSingleton<IOptions<JwtOptions>>(Options.Create(jwt));
@@ -115,6 +114,10 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             }
         };
     });
+builder.Services.AddAuthorization(options =>
+{
+    options.AddPolicy("Staff", policy => policy.RequireRole("Admin", "Worker"));
+});
 
 // DbContext
 var connectionString =

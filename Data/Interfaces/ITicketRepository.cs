@@ -73,4 +73,12 @@ public interface ITicketRepository
     /// <returns></returns>
     Task<List<Ticket>> ListActiveBehindAsync(int position, int take, CancellationToken ct = default);
 
+    /// <summary>
+    /// Gets a ticket by its public ID.
+    /// </summary>
+    /// <param name="publicId"></param>
+    /// <param name="ct"></param>
+    /// <returns></returns>
+    Task<Ticket?> GetByPublicIdAsync(string publicId, CancellationToken ct = default);
+
 }

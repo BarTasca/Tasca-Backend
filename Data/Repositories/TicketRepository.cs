@@ -77,4 +77,10 @@ public class TicketRepository : ITicketRepository
             .Take(take)
             .ToListAsync(ct);
     }
+
+    public Task<Ticket?> GetByPublicIdAsync(string publicId, CancellationToken ct = default)
+        => _db.Tickets
+              .AsNoTracking()
+              .Include(t => t.Customer)
+              .FirstOrDefaultAsync(t => t.PublicId == publicId, ct);
 }
