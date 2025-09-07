@@ -26,6 +26,20 @@ catch
 var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(o => o.ListenAnyIP(8080));
 
+// CORS
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("DevFront", p =>
+        p.WithOrigins("http://localhost:5173")
+         .AllowAnyMethod()
+         .AllowAnyHeader());
+
+    options.AddPolicy("ProdFront", p =>
+        p.WithOrigins("https://Dominio_tasca") //aun no lo tengo
+         .AllowAnyMethod()
+         .AllowAnyHeader());
+});
+
 static string EnvOrThrow(string key) =>
     Environment.GetEnvironmentVariable(key)
     ?? throw new InvalidOperationException($"{key} not set");
@@ -76,6 +90,17 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
 
         options.Events = new JwtBearerEvents
         {
+            OnMessageReceived = context =>
+            {
+                var accessToken = context.Request.Query["access_token"];
+                var path = context.HttpContext.Request.Path;
+                if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/queue"))
+                {
+                    context.Token = accessToken;
+                }
+                return Task.CompletedTask;
+            },
+
             OnChallenge = context =>
             {
                 context.HandleResponse();
@@ -129,6 +154,8 @@ app.UseDefaultFiles();
 app.UseStaticFiles();
 
 // app.UseHttpsRedirection();
+
+app.UseCors(app.Environment.IsDevelopment() ? "DevFront" : "ProdFront");
 
 app.UseAuthentication();
 app.UseAuthorization();
