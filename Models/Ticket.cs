@@ -7,6 +7,9 @@ namespace BarTasca.Models
     {
         public int Id { get; set; }
 
+        [Required]
+        public string PublicId { get; set; } = default!;
+
         [ForeignKey(nameof(Customer))]
         public int CustomerId { get; set; }
         public Customer Customer { get; set; } = null!;

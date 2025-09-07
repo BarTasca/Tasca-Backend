@@ -29,7 +29,7 @@ namespace BarTasca.Services.Services
 
             if (!VerifyPassword(dto.Password, user.PasswordHash)) return null;
 
-            var expires = DateTime.UtcNow.AddHours(_jwt.ExpiresHours);
+            var expires = DateTime.UtcNow.AddHours(_jwt.StaffExpiresHours);
             var token = CreateJwt(user, expires);
 
             return new LoginResponseDto

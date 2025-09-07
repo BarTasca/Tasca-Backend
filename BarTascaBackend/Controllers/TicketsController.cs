@@ -9,10 +9,12 @@ namespace BarTascaBackend.Controllers;
 public class TicketsController : ControllerBase
 {
     private readonly ITicketService _service;
+    private readonly ITicketAuthService _ticketAuth;
 
-    public TicketsController(ITicketService service)
+    public TicketsController(ITicketService service, ITicketAuthService authService)
     {
         _service = service;
+        _ticketAuth = authService;
     }
 
     [HttpPost]
@@ -30,5 +32,35 @@ public class TicketsController : ControllerBase
         var result = await _service.GetAsync(id, ct);
         if (result is null) return NotFound();
         return Ok(result);
+    }
+
+    [HttpGet("{id:int}/status")]
+    public async Task<ActionResult<TicketStatusDto>> GetStatus(string publicId, CancellationToken ct)
+    {
+        var user = HttpContext.User;
+        if (user?.Identity?.IsAuthenticated != true) return Unauthorized();
+        var dto = await _service.GetStatusAsync(publicId, ct);
+
+        var isStaff = User.IsInRole("Admin") || User.IsInRole("Worker");
+        if (isStaff)
+        {
+            if (dto is null) return NotFound();
+            return Ok(dto);
+        }
+
+        var claim = User.FindFirst("ticket_public_id");
+        if (claim is null || !string.Equals(claim.Value, publicId, StringComparison.Ordinal)) return Forbid();
+
+        if (dto is null) return NotFound();
+        return Ok(dto);
+    }
+
+    [HttpPost("{publicId}/token")]
+    public async Task<ActionResult<object>> CreateTicketToken(string publicId, CancellationToken ct)
+    {
+        var token = await _ticketAuth.GenerateTokenAsync(publicId, ct);
+        if (token is null) return NotFound();
+
+        return Ok(new { token });
     }
 }

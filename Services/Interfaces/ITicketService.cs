@@ -64,4 +64,12 @@ public interface ITicketService
     /// <returns>Updated ticket details or null if not found.</returns>
     Task<TicketDetailDto?> NotifyAsync(int id, bool force = false, CancellationToken ct = default);
 
+    /// <summary>
+    /// Gets the status of a ticket by PublicId.
+    /// </summary>
+    /// <param name="id"></param>
+    /// <param name="ct"></param>
+    /// <returns></returns>
+    Task<TicketStatusDto?> GetStatusAsync(string publicId, CancellationToken ct = default);
+
 }

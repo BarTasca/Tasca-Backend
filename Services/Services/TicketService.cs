@@ -49,7 +49,8 @@ public class TicketService : ITicketService
             CustomerId = customer.Id,
             PeopleCount = dto.PeopleCount,
             Position = newPosition,
-            Status = TicketStatus.Waiting
+            Status = TicketStatus.Waiting,
+            PublicId = Ulid.NewUlid().ToString()
         };
 
         ticket.Customer = customer;
@@ -213,5 +214,24 @@ public class TicketService : ITicketService
         dto.Ahead = ahead;
         dto.CustomerFullName = string.Empty;
         return dto;
+    }
+
+    public async Task<TicketStatusDto?> GetStatusAsync(string publicId, CancellationToken ct = default)
+    {
+        var ticket = await _tickets.GetByPublicIdAsync(publicId, ct);
+        if (ticket is null) return null;
+
+        var ahead = await _tickets.CountAheadAsync(ticket.Id, ct);
+
+        return new TicketStatusDto
+        {
+            PublicId = ticket.PublicId,
+            Status = ticket.Status.ToString(),
+            Ahead = ahead,
+            Position = ticket.Position,
+            PeopleCount = ticket.PeopleCount,
+            CreatedAt = ticket.CreatedAt,
+            NotifiedAt = ticket.NotifiedAt
+        };
     }
 }
