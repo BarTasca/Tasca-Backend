@@ -5,6 +5,7 @@ using Microsoft.IdentityModel.Tokens;
 using System.Security.Claims;
 using System.Text;
 using BarTasca.Services.Interfaces;
+using Microsoft.Extensions.Options;
 
 namespace BarTasca.Services.Services
 {
@@ -13,9 +14,9 @@ namespace BarTasca.Services.Services
         private readonly ITicketRepository _repo;
         private readonly JwtOptions _jwt;
 
-        public TicketAuthService(ITicketRepository repo, JwtOptions jwt) {
+        public TicketAuthService(ITicketRepository repo, IOptions<JwtOptions> jwt) {
             _repo = repo;
-            _jwt = jwt ?? throw new InvalidOperationException("Jwt options not set");
+            _jwt = jwt?.Value ?? throw new InvalidOperationException("Jwt options not set");
         }
 
         public async Task<string?> GenerateTokenAsync(string publicId, CancellationToken ct = default)
