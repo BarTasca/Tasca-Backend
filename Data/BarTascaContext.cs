@@ -45,13 +45,6 @@ public class ColaDbContext : DbContext
         // Índice para cálculo de cola
         modelBuilder.Entity<Ticket>()
             .HasIndex(t => new { t.Status, t.Position });
-
-        // Índice para búsqueda por PublicId
-        modelBuilder.Entity<Ticket>(b =>
-        {
-            b.HasIndex(t => t.PublicId).IsUnique();
-            b.Property(t => t.PublicId).IsRequired();
-        });
     }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

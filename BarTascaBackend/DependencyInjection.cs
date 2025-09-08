@@ -13,7 +13,6 @@ public static class DependencyInjection
         {
             c.SwaggerDoc("v1", new OpenApiInfo { Title = "BarTascaBackend", Version = "v1" });
 
-            // HTTP Bearer (Swagger añade "Bearer " automáticamente)
             c.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
             {
                 Type = SecuritySchemeType.Http,
@@ -44,6 +43,8 @@ public static class DependencyInjection
     public static IServiceCollection AddBackgroundWorkers(this IServiceCollection services)
     {
         services.AddHostedService<NotificationHostedService>();
+        services.AddHostedService<CustomerAnonymizationHostedService>();
         return services;
     }
 }
+ 

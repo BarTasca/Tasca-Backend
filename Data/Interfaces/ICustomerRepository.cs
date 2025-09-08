@@ -28,4 +28,14 @@ public interface ICustomerRepository
     /// <param name="ct">Cancellation token.</param>
     /// <returns>The number of state entries written to the database.</returns>
     Task<int> SaveChangesAsync(CancellationToken ct = default);
+
+    /// <summary>
+    /// Lists customers eligible for anonymization.
+    /// </summary>
+    /// <param name="anonymizeBeforeUtc"></param>
+    /// <param name="take"></param>
+    /// <param name="ct"></param>
+    /// <returns></returns>
+    Task<List<Customer>> ListForAnonymizationAsync(DateTime anonymizeBeforeUtc, int take, CancellationToken ct = default);
+
 }
