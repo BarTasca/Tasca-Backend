@@ -18,4 +18,12 @@ public class CustomerRepository : ICustomerRepository
 
     public Task<int> SaveChangesAsync(CancellationToken ct = default)
         => _db.SaveChangesAsync(ct);
+
+    public Task<List<Customer>> ListForAnonymizationAsync(DateTime anonymizeBeforeUtc, int take, CancellationToken ct = default) =>
+        _db.Customers
+              .AsTracking()
+              .Where(c => !c.IsAnonymized && c.CreatedAt <= anonymizeBeforeUtc)
+              .OrderBy(c => c.Id)
+              .Take(take)
+              .ToListAsync(ct);
 }
