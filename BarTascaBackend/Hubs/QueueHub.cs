@@ -1,6 +1,6 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using BarTasca.Data.Interfaces;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
-using BarTasca.Data.Interfaces;
 
 namespace BarTascaBackend.Hubs;
 
@@ -8,16 +8,25 @@ namespace BarTascaBackend.Hubs;
 public class QueueHub : Hub
 {
     private readonly ITicketRepository _tickets;
+    private readonly ILogger<QueueHub> _logger;
 
-    public QueueHub(ITicketRepository tickets)
+    public QueueHub(ITicketRepository tickets, ILogger<QueueHub> logger)
     {
         _tickets = tickets;
+        _logger = logger;
     }
 
-    public async Task JoinTicketGroup(string publicId, CancellationToken ct = default)
+    public async Task JoinTicketGroup(string publicId)
     {
+        var ct = Context.ConnectionAborted;
+
         var user = Context.User;
         if (user is null) throw new Exception("Unauthorized");
+
+        _logger.LogInformation("JoinTicketGroup: pid={Pid}, claim={Claim}",
+             publicId,
+             user.FindFirst("ticket_public_id")?.Value);
+
         var ticket = await _tickets.GetByPublicIdAsync(publicId, ct);
         if (ticket is null) throw new HubException("NotFound");
 

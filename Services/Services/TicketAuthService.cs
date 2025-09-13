@@ -22,7 +22,7 @@ namespace BarTasca.Services.Services
         public async Task<string?> GenerateTokenAsync(string publicId, CancellationToken ct = default)
         {
             var ticket = await _repo.GetByPublicIdAsync(publicId.ToString(), ct);
-            if (ticket is null) throw new InvalidOperationException("Ticket not found");
+            if (ticket is null) return null;
 
             var expires = DateTime.UtcNow.AddHours(_jwt.CustomerExpiresHours);
 

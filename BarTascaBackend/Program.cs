@@ -24,13 +24,17 @@ catch
 }
 
 var builder = WebApplication.CreateBuilder(args);
-builder.WebHost.ConfigureKestrel(o => o.ListenAnyIP(8080));
+builder.WebHost.ConfigureKestrel(o => o.ListenAnyIP(5000));
 
 // CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("DevFront", p =>
         p.WithOrigins("http://localhost:5173")
+         .AllowAnyMethod()
+         .AllowAnyHeader());
+    options.AddPolicy("DevFront", p =>
+        p.WithOrigins("http://localhost:5174") //local
          .AllowAnyMethod()
          .AllowAnyHeader());
 
@@ -137,7 +141,10 @@ builder.Services.AddApplicationServices();
 
 // SignalR + Infrastructure
 builder.Services.AddApiLayer();
-builder.Services.AddSignalR();
+builder.Services.AddSignalR(options =>
+{
+    options.EnableDetailedErrors = true;
+});
 builder.Services.AddInfrastructure<QueueHub>();
 
 

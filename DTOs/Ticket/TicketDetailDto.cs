@@ -3,6 +3,7 @@
     public record TicketDetailDto
     {
         public int Id { get; init; }
+        public string PublicId { get; init; } = string.Empty;
         public byte PeopleCount { get; init; }
         public int Position { get; init; }
         public string Status { get; init; } = string.Empty;

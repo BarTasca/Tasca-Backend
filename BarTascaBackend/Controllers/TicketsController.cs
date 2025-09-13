@@ -34,7 +34,7 @@ public class TicketsController : ControllerBase
         return Ok(result);
     }
 
-    [HttpGet("{id:int}/status")]
+    [HttpGet("{publicId}/status")]
     public async Task<ActionResult<TicketStatusDto>> GetStatus(string publicId, CancellationToken ct)
     {
         var user = HttpContext.User;
