@@ -19,7 +19,7 @@ try
 }
 catch
 {
-    throw new InvalidOperationException("Error loading environment variables from .env file");
+    
 }
 
 var builder = WebApplication.CreateBuilder(args);
@@ -36,7 +36,9 @@ builder.Services.AddCors(options =>
          .AllowCredentials());
 
     options.AddPolicy("ProdFront", p =>
-        p.WithOrigins("https://<ALB_DNS>", "https://<tu_dominio_opcional>")
+        p.WithOrigins(
+            "http://a2bdd34dc023648ce9ab0fc206fe5ba6-b148eaf9597343eb.elb.us-east-1.amazonaws.com",
+            "https://a2bdd34dc023648ce9ab0fc206fe5ba6-b148eaf9597343eb.elb.us-east-1.amazonaws.com")
          .AllowAnyHeader()
          .AllowAnyMethod()
          .AllowCredentials());
@@ -170,5 +172,13 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<QueueHub>("/hubs/queue");
+
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<ColaDbContext>();
+    db.Database.Migrate();
+}
+
+app.MapGet("/health", () => Results.Ok("Healthy"));
 
 app.Run();
