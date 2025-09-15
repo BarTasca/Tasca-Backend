@@ -1,17 +1,16 @@
 using System.Text;
 using BarTasca.Data;
 using BarTasca.Infrastructure;
+using BarTasca.Infrastructure.Options;
 using BarTasca.Services;
 using BarTasca.Services.Mapping;
 using BarTasca.Services.Options;
-using BarTasca.Infrastructure.Options;
 using BarTascaBackend;
 using BarTascaBackend.Hubs;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-using Microsoft.OpenApi.Models;
 
 
 try
@@ -29,19 +28,18 @@ builder.WebHost.ConfigureKestrel(o => o.ListenAnyIP(5000));
 // CORS
 builder.Services.AddCors(options =>
 {
+    // DEV: localhost
     options.AddPolicy("DevFront", p =>
-        p.WithOrigins("http://localhost:5173")
+        p.WithOrigins("http://localhost:5173", "http://localhost:5174")
+         .AllowAnyHeader()
          .AllowAnyMethod()
-         .AllowAnyHeader());
-    options.AddPolicy("DevFront", p =>
-        p.WithOrigins("http://localhost:5174") //local
-         .AllowAnyMethod()
-         .AllowAnyHeader());
+         .AllowCredentials());
 
     options.AddPolicy("ProdFront", p =>
-        p.WithOrigins("https://Dominio_tasca") //aun no lo tengo
+        p.WithOrigins("https://<ALB_DNS>", "https://<tu_dominio_opcional>")
+         .AllowAnyHeader()
          .AllowAnyMethod()
-         .AllowAnyHeader());
+         .AllowCredentials());
 });
 
 static string EnvOrThrow(string key) =>

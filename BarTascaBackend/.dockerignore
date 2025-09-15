@@ -1,0 +1,27 @@
+# Salidas de compilación
+bin/
+obj/
+out/
+
+# Configuración de IDEs
+.vscode/
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Logs y temporales
+*.log
+*.tmp
+*.swp
+
+# Archivos locales de configuración
+*.Secrets.*
+*.Development.*
+.env
+.env.*.local
+
+# Otros innecesarios
+Dockerfile.*
+docker-compose.*

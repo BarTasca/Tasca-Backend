@@ -199,10 +199,10 @@ public class SignalRNotificationService<THub> : INotificationService where THub 
     }
 
     private static string BuildReminderMessage(Ticket ticket, int ahead)
-        => $"Bar La Tasca: quedan {ahead} por delante. Ticket #{ticket.Position} (personas: {ticket.PeopleCount}).";
+        => $"Bar La Tasca: quedan {ahead} por delante. Ticket #{ticket.Position} (personas: {ticket.PeopleCount}). Ves vieniendo y que aproveche.";
 
     private static string BuildManualMessage(Ticket ticket, int ahead)
-        => $"Bar La Tasca: actualización de tu ticket #{ticket.Position}. Quedan {ahead} por delante.";
+        => $"Bar La Tasca: actualización de tu ticket #{ticket.Position}. Quedan {ahead} por delante. Ves vieniendo y que aproveche.+";
 
     private async Task SendSmsAndPersistAsync(Ticket ticket, NotificationType type, string body, CancellationToken ct)
     {
