@@ -202,15 +202,16 @@ public class SignalRNotificationService<THub> : INotificationService where THub 
         => $"Bar La Tasca: quedan {ahead} por delante. Ticket #{ticket.Position} (personas: {ticket.PeopleCount}). Ves vieniendo y que aproveche.";
 
     private static string BuildManualMessage(Ticket ticket, int ahead)
-        => $"Bar La Tasca: actualización de tu ticket #{ticket.Position}. Quedan {ahead} por delante. Ves vieniendo y que aproveche.+";
+        => $"Bar La Tasca: actualización de tu ticket #{ticket.Position}. Quedan {ahead} por delante. Ves vieniendo y que aproveche.";
 
     private async Task SendSmsAndPersistAsync(Ticket ticket, NotificationType type, string body, CancellationToken ct)
     {
-        var to = ticket.Customer?.Phone;
+        var toRaw = ticket.Customer?.Phone;
+        var toNorm = NormalizePhone(toRaw);
 
-        if (!IsE164(to))
+        if (!IsE164(toNorm))
         {
-            _logger.LogWarning("Invalid phone number for SMS: ticketId={TicketId} phone={Phone}", ticket.Id, to ?? "<null>");
+            _logger.LogWarning("Invalid phone number for SMS: ticketId={TicketId} phone={Phone}", ticket.Id, toNorm ?? "<null>");
 
             await _notifications.AddAsync(new Notification
             {
@@ -230,7 +231,7 @@ public class SignalRNotificationService<THub> : INotificationService where THub 
         try
         {
             var msg = await MessageResource.CreateAsync(
-                to: new Twilio.Types.PhoneNumber(to),
+                to: new Twilio.Types.PhoneNumber(toNorm),
                 from: new Twilio.Types.PhoneNumber(_twilioFrom),
                 body: body
             );
@@ -251,12 +252,17 @@ public class SignalRNotificationService<THub> : INotificationService where THub 
         await _notifications.SaveChangesAsync(ct);
     }
 
+    private static string NormalizePhone(string? input) => string.IsNullOrWhiteSpace(input) ? "" :
+    input.Trim().Replace(" ", "").Replace("-", "").Replace("(", "").Replace(")", "");
+
     private static bool IsE164(string? phone)
     {
+        phone = NormalizePhone(phone);
         if (string.IsNullOrWhiteSpace(phone)) return false;
         if (!phone.StartsWith("+")) return false;
         for (int i = 1; i < phone.Length; i++)
             if (!char.IsDigit(phone[i])) return false;
         return phone.Length >= 8 && phone.Length <= 16;
     }
+
 }
