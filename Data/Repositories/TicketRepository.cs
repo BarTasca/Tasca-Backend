@@ -54,7 +54,7 @@ public class TicketRepository : ITicketRepository
     public Task<int> SaveChangesAsync(CancellationToken ct = default)
         => _db.SaveChangesAsync(ct);
 
-    public Task<List<Ticket>> ListByStatusesAsync(TicketStatus[] statuses, int take = 100, CancellationToken ct = default)
+    public Task<List<Ticket>> ListByStatusesAsync(TicketStatus[] statuses, int take, CancellationToken ct = default)
     {
         return _db.Tickets
               .AsNoTracking()
