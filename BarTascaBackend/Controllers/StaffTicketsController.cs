@@ -6,7 +6,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace BarTascaBackend.Controllers;
 
 [ApiController]
-[Authorize(Roles = "Admin,Waiter")]
+[Authorize(Roles = "Admin,Worker")]
 [Route("api/staff/tickets")]
 public class StaffTicketsController : ControllerBase
 {
