@@ -15,6 +15,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         private readonly ICustomerRepository _customers = Substitute.For<ICustomerRepository>();
         private readonly ITicketRepository _tickets = Substitute.For<ITicketRepository>();
         private readonly INotificationService _notifications = Substitute.For<INotificationService>();
+        private readonly IServiceStateService _serviceState = Substitute.For<IServiceStateService>();   
         private readonly IMapper _mapper = Substitute.For<IMapper>();
 
         private readonly Faker _faker = new("es");
@@ -47,7 +48,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task NotifyAsync_TicketNotFound_ReturnsNull()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
             int ticketId = _faker.Random.Int(1, 1000);
             _tickets.GetByIdAsync(ticketId, Arg.Any<CancellationToken>())
                     .Returns(Task.FromResult<Ticket?>(null));
@@ -62,7 +63,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task NotifyAsync_TicketInTerminalStatus_ThrowsInvalidOperationException()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
             int ticketId = _faker.Random.Int(1, 1000);
             var userName = _faker.Name.FullName();
             var terminalStatuses = new[] { TicketStatus.Confirmed, TicketStatus.Skipped, TicketStatus.Cancelled };
@@ -90,7 +91,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task NotifyAsync_TicketAlreadyNotified_ForceFalse_ReturnsDtoWithoutChanges()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
             int ticketId = _faker.Random.Int(1, 1000);
             var userName = _faker.Name.FullName();
             var ticket = new Ticket
@@ -120,7 +121,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task NotifyAsync_TicketAlreadyNotified_ForceTrue_UpdatesNotifiedAtAndSendsNotification()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
             int ticketId = _faker.Random.Int(1, 1000);
             var userName = _faker.Name.FullName();
             var ticket = new Ticket
@@ -152,7 +153,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task NotifyAsync_TicketIsWaiting_UpdatesStatusToNotifiedAndSendsNotification()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
             int ticketId = _faker.Random.Int(1, 1000);
             var userName = _faker.Name.FullName();
             var ticket = new Ticket
@@ -183,7 +184,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task NotifyAsync_ReturnedDto_HasClearedCustomerFullNameAndCorrectAhead()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
             int ticketId = _faker.Random.Int(1, 1000);
             var userName = _faker.Name.FullName();
             var ticket = new Ticket

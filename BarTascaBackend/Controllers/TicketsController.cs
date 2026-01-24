@@ -1,6 +1,8 @@
 using BarTasca.DTOs.Ticket;
 using BarTasca.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
+using BarTasca.Services.Exceptions;
+using Microsoft.AspNetCore.Authorization;
 
 namespace BarTascaBackend.Controllers;
 
@@ -21,9 +23,16 @@ public class TicketsController : ControllerBase
     public async Task<ActionResult<TicketDetailDto>> Create([FromBody] CreateTicketDto dto, CancellationToken ct)
     {
         if (!ModelState.IsValid) return ValidationProblem(ModelState);
-        var created = await _service.CreateAsync(dto, ct);
-        // 201 con Location al recurso
-        return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+
+        try
+        {
+            var created = await _service.CreateAsync(dto, ct);
+            return CreatedAtAction(nameof(GetById), new { id = created.Id }, created);
+        }
+        catch(ServiceClosedException)
+        {
+            return Conflict(new { code = "SERVICE_CLOSED" });
+        }
     }
 
     [HttpGet("{id:int}")]
@@ -63,4 +72,22 @@ public class TicketsController : ControllerBase
 
         return Ok(new { token });
     }
+
+    [HttpPost("{publicId}/cancel")]
+    [Authorize(AuthenticationSchemes = "Ticket")]
+    public async Task<ActionResult<TicketDetailDto>> CancelByClient(string publicId, CancellationToken ct)
+    {
+        try
+        {
+            var result = await _service.CancelByPublicIdAsync(publicId, ct);
+            if (result is null) return NotFound();
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+    }
+
+
 }
