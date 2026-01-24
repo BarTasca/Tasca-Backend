@@ -137,6 +137,7 @@ builder.Services.AddDbContext<ColaDbContext>(opt =>
 // Repos y servicios de aplicación
 builder.Services.AddRepositories();
 builder.Services.AddAutoMapper(cfg => cfg.AddProfile<TicketMappingProfile>());
+builder.Services.AddAutoMapper(cfg => cfg.AddProfile<ServiceStateMappingProfile>());
 builder.Services.AddApplicationServices();
 
 // SignalR + Infrastructure

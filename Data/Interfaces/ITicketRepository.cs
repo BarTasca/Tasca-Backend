@@ -70,7 +70,7 @@ public interface ITicketRepository
     /// <param name="position"></param>
     /// <param name="take"></param>
     /// <param name="ct"></param>
-    /// <returns></returns>
+    /// <returns>List of tickets.</returns>
     Task<List<Ticket>> ListActiveBehindAsync(int position, int take, CancellationToken ct = default);
 
     /// <summary>
@@ -78,7 +78,7 @@ public interface ITicketRepository
     /// </summary>
     /// <param name="publicId"></param>
     /// <param name="ct"></param>
-    /// <returns></returns>
+    /// <returns>the ticket if found; otherwise, null.</returns>
     Task<Ticket?> GetByPublicIdAsync(string publicId, CancellationToken ct = default);
 
 }

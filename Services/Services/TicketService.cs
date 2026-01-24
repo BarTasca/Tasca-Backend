@@ -3,6 +3,7 @@ using BarTasca.Data.Interfaces;
 using BarTasca.DTOs.Ticket;
 using BarTasca.Models;
 using BarTasca.Services.Interfaces;
+using BarTasca.Services.Exceptions;
 
 namespace BarTasca.Services.Services;
 
@@ -12,13 +13,15 @@ public class TicketService : ITicketService
     private readonly ITicketRepository _tickets;
     private readonly IMapper _mapper;
     private readonly INotificationService _notificationService;
+    private readonly IServiceStateService _serviceStateService;
 
-    public TicketService(ICustomerRepository customers, ITicketRepository tickets, IMapper mapper, INotificationService notificationService)
+    public TicketService(ICustomerRepository customers, ITicketRepository tickets, IMapper mapper, INotificationService notificationService, IServiceStateService serviceStateService)
     {
         _customers = customers;
         _tickets = tickets;
         _mapper = mapper;
         _notificationService = notificationService;
+        _serviceStateService = serviceStateService;
     }
 
     public async Task<TicketDetailDto> CreateAsync(CreateTicketDto dto, CancellationToken ct = default)
@@ -32,6 +35,11 @@ public class TicketService : ITicketService
             dtoExisting.CustomerFullName = string.Empty;
             return dtoExisting;
         }
+
+        // Ensure service is open
+        var ServiceState = await _serviceStateService.GetAsync(ct);
+        if (!ServiceState.IsOpen)
+            throw new ServiceClosedException();
 
         var customer = await _customers.GetByPhoneAsync(dto.Phone, ct);
         if (customer is null)
@@ -100,6 +108,14 @@ public class TicketService : ITicketService
 
     public Task<TicketDetailDto?> CancelAsync(int id, CancellationToken ct = default)
         => UpdateStatusAsync(id, TicketStatus.Cancelled, setConfirmedAt: false, ct);
+
+    public async Task<TicketDetailDto?> CancelByPublicIdAsync(string publicId, CancellationToken ct = default)
+    {
+        var ticket = await _tickets.GetByPublicIdAsync(publicId, ct);
+        if (ticket is null) return null;
+
+        return await CancelAsync(ticket.Id, ct);
+    }
 
     public async Task<IReadOnlyList<TicketStaffListDto>> ListForStaffAsync(string status = "active", int take = 20, CancellationToken ct = default)
     {

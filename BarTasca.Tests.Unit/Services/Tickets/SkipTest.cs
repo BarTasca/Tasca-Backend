@@ -15,6 +15,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         private readonly ICustomerRepository _customers = Substitute.For<ICustomerRepository>();
         private readonly ITicketRepository _tickets = Substitute.For<ITicketRepository>();
         private readonly INotificationService _notifications = Substitute.For<INotificationService>();
+        private readonly IServiceStateService _serviceState = Substitute.For<IServiceStateService>();
         private readonly IMapper _mapper = Substitute.For<IMapper>();
 
         private readonly Faker _faker = new("es");
@@ -47,7 +48,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task TicketNotFound_ReturnsNull()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
             var ticketId = _faker.Random.Int(1, 1000);
             _tickets.GetByIdAsync(ticketId, Arg.Any<CancellationToken>())
                     .Returns(Task.FromResult<Ticket?>(null));
@@ -61,7 +62,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task ValidTransition_UpdatesStatusAndSaves()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
 
             var ticketId = 1;
             var ticket = new Ticket
@@ -114,7 +115,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task InvalidTransition_ThrowsException()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
             var ticketId = 1;
             var target = TicketStatus.Skipped;
             var ticket = new Ticket
@@ -142,7 +143,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task AlreadySkipped_DoesNotSaveButBroadcasts()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
             var ticketId = 1;
             var ticket = new Ticket
             {

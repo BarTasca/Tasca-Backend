@@ -15,6 +15,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         private readonly ICustomerRepository _customers = Substitute.For<ICustomerRepository>();
         private readonly ITicketRepository _tickets = Substitute.For<ITicketRepository>();
         private readonly INotificationService _notifications = Substitute.For<INotificationService>();
+        private readonly IServiceStateService _serviceState = Substitute.For<IServiceStateService>();
         private readonly IMapper _mapper = Substitute.For<IMapper>();
 
         private readonly Faker _faker = new("es");
@@ -47,7 +48,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task GetAsync_ticket_not_found_returns_null_and_does_not_call_mapper_or_count()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
             var ticketId = 1;
             _tickets.GetByIdAsync(ticketId, Arg.Any<CancellationToken>())
                     .Returns(Task.FromResult<Ticket?>(null));
@@ -62,7 +63,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task GetAsync_existing_ticket_returns_dto_with_correct_ahead_and_empty_customer_name()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
             var ticketId = 1;
             var ticket = new Ticket
             {
@@ -113,7 +114,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
                     Phone = _faker.Phone.PhoneNumber()
                 }
             };
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
             _tickets.GetByIdAsync(ticket.Id, Arg.Any<CancellationToken>())
                     .Returns(Task.FromResult<Ticket?>(ticket));
             _tickets.CountAheadAsync(ticket.Id, Arg.Any<CancellationToken>())
@@ -127,7 +128,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task GetAsync_invalid_id_returns_null()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
             var invalidId = 0;
             var result = await svc.GetAsync(invalidId);
             result.Should().BeNull();

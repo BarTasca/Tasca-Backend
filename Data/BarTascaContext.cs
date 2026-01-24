@@ -15,6 +15,7 @@ public class ColaDbContext : DbContext
     public DbSet<Ticket> Tickets => Set<Ticket>();
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<StaffUser> StaffUsers => Set<StaffUser>();
+    public DbSet<ServiceState> ServiceStates => Set<ServiceState>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -45,6 +46,11 @@ public class ColaDbContext : DbContext
         // Índice para cálculo de cola
         modelBuilder.Entity<Ticket>()
             .HasIndex(t => new { t.Status, t.Position });
+
+        // Configuración de RowVersion para concurrencia
+        modelBuilder.Entity<ServiceState>()
+            .Property(e => e.RowVersion)
+            .IsRowVersion();
     }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

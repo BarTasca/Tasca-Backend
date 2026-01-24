@@ -72,4 +72,12 @@ public interface ITicketService
     /// <returns></returns>
     Task<TicketStatusDto?> GetStatusAsync(string publicId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Cancels a ticket by PublicId.
+    /// </summary>
+    /// <param name="publicId"></param>
+    /// <param name="ct"></param>
+    /// <returns></returns>
+    Task<TicketDetailDto?> CancelByPublicIdAsync(string publicId, CancellationToken ct = default);
+
 }
