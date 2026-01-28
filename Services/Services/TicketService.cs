@@ -4,6 +4,7 @@ using BarTasca.DTOs.Ticket;
 using BarTasca.Models;
 using BarTasca.Services.Interfaces;
 using BarTasca.Services.Exceptions;
+using Microsoft.Extensions.Logging;
 
 namespace BarTasca.Services.Services;
 
@@ -14,19 +15,22 @@ public class TicketService : ITicketService
     private readonly IMapper _mapper;
     private readonly INotificationService _notificationService;
     private readonly IServiceStateService _serviceStateService;
+    private readonly ILogger<TicketService> _logger;
 
-    public TicketService(ICustomerRepository customers, ITicketRepository tickets, IMapper mapper, INotificationService notificationService, IServiceStateService serviceStateService)
+    public TicketService(ICustomerRepository customers, ITicketRepository tickets, IMapper mapper, INotificationService notificationService, IServiceStateService serviceStateService, ILogger<TicketService> logger)
     {
         _customers = customers;
         _tickets = tickets;
         _mapper = mapper;
         _notificationService = notificationService;
         _serviceStateService = serviceStateService;
+        _logger = logger;
     }
 
     public async Task<TicketDetailDto> CreateAsync(CreateTicketDto dto, CancellationToken ct = default)
     {
         var existingActive = await _tickets.GetActiveByPhoneAsync(dto.Phone, ct);
+
         if (existingActive is not null)
         {
             var aheadExisting = await _tickets.CountAheadAsync(existingActive.Id, ct);
@@ -61,7 +65,7 @@ public class TicketService : ITicketService
             PublicId = Ulid.NewUlid().ToString()
         };
 
-        ticket.Customer = customer;
+        //ticket.Customer = customer;
 
         await _tickets.AddAsync(ticket, ct);
         await _tickets.SaveChangesAsync(ct);

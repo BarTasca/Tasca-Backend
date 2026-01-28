@@ -3,6 +3,7 @@ using BarTasca.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using BarTasca.Services.Exceptions;
 using Microsoft.AspNetCore.Authorization;
+using System.Security.Claims;
 
 namespace BarTascaBackend.Controllers;
 
@@ -74,9 +75,16 @@ public class TicketsController : ControllerBase
     }
 
     [HttpPost("{publicId}/cancel")]
-    [Authorize(AuthenticationSchemes = "Ticket")]
+    [Authorize]
     public async Task<ActionResult<TicketDetailDto>> CancelByClient(string publicId, CancellationToken ct)
     {
+        var claimPublicId = User.FindFirstValue("ticket_public_id");
+        if (string.IsNullOrWhiteSpace(claimPublicId))
+            return Forbid();
+
+        if (!string.Equals(claimPublicId, publicId, StringComparison.Ordinal))
+            return Forbid();
+
         try
         {
             var result = await _service.CancelByPublicIdAsync(publicId, ct);
