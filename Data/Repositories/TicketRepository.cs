@@ -55,19 +55,16 @@ public class TicketRepository : ITicketRepository
         => _db.SaveChangesAsync(ct);
 
     public Task<List<Ticket>> ListByStatusesAsync(TicketStatus[] statuses, int take, CancellationToken ct = default)
-    {
-        return _db.Tickets
+        => _db.Tickets
               .AsNoTracking()
               .Include(t => t.Customer)
               .Where(t => statuses.Contains(t.Status))
               .OrderBy(t => t.Position)
               .Take(take)
               .ToListAsync(ct);
-    }
 
     public Task<List<Ticket>> ListActiveBehindAsync(int position, int take, CancellationToken ct = default)
-    {
-        return _db.Tickets
+        => _db.Tickets
             .AsNoTracking()
             .Include(t => t.Customer)
             .Where(t =>
@@ -76,11 +73,17 @@ public class TicketRepository : ITicketRepository
             .OrderBy(t => t.Position)
             .Take(take)
             .ToListAsync(ct);
-    }
 
     public Task<Ticket?> GetByPublicIdAsync(string publicId, CancellationToken ct = default)
         => _db.Tickets
               .AsNoTracking()
               .Include(t => t.Customer)
               .FirstOrDefaultAsync(t => t.PublicId == publicId, ct);
+
+    public Task<int> CountActiveAsync(CancellationToken ct = default)
+        => _db.Tickets
+            .AsNoTracking()
+            .Where(t => t.Status == TicketStatus.Waiting || t.Status == TicketStatus.Notified)
+            .CountAsync(ct);
+
 }

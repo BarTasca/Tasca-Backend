@@ -147,6 +147,7 @@ builder.Services.AddSignalR(options =>
     options.EnableDetailedErrors = true;
 });
 builder.Services.AddInfrastructure<QueueHub>();
+builder.Services.AddPublicInfrastructure<PublicQueueHub>();
 
 
 //Workers
@@ -173,6 +174,8 @@ app.UseAuthorization();
 
 app.MapControllers();
 app.MapHub<QueueHub>("/hubs/queue");
+app.MapHub<PublicQueueHub>("/hubs/public-queue");
+
 
 using (var scope = app.Services.CreateScope())
 {

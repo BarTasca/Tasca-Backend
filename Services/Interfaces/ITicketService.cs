@@ -1,4 +1,5 @@
-﻿using BarTasca.DTOs.Ticket;
+﻿using BarTasca.DTOs.Queue;
+using BarTasca.DTOs.Ticket;
 
 namespace BarTasca.Services.Interfaces;
 
@@ -79,5 +80,12 @@ public interface ITicketService
     /// <param name="ct"></param>
     /// <returns></returns>
     Task<TicketDetailDto?> CancelByPublicIdAsync(string publicId, CancellationToken ct = default);
+
+    /// <summary>
+    /// Gets the queue ahead information.
+    /// </summary>
+    /// <param name="ct"></param>
+    /// <returns>The queue ahead data.</returns>
+    Task<QueueAheadDto> GetAheadAsync(CancellationToken ct = default);
 
 }

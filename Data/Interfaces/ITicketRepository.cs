@@ -81,4 +81,11 @@ public interface ITicketRepository
     /// <returns>the ticket if found; otherwise, null.</returns>
     Task<Ticket?> GetByPublicIdAsync(string publicId, CancellationToken ct = default);
 
+    /// <summary>
+    /// Counts active tickets (Waiting/Notified).
+    /// </summary>
+    /// <param name="ct"></param>
+    /// <returns>Number of active tickets.</returns>
+    Task<int> CountActiveAsync(CancellationToken ct = default);
+
 }

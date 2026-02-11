@@ -1,4 +1,5 @@
 using BarTasca.DTOs.Ticket;
+using BarTasca.DTOs.Queue;
 using BarTasca.Services.Interfaces;
 using Microsoft.AspNetCore.Mvc;
 using BarTasca.Services.Exceptions;
@@ -94,6 +95,21 @@ public class TicketsController : ControllerBase
         catch (InvalidOperationException ex)
         {
             return Conflict(new { error = ex.Message });
+        }
+    }
+
+    [HttpGet("ahead")]
+    [AllowAnonymous]
+    public async Task<ActionResult<QueueAheadDto>> GetAhead(CancellationToken ct)
+    {
+        try
+        {
+            QueueAheadDto dto = await _service.GetAheadAsync(ct);
+            return Ok(dto);
+        }
+        catch (ServiceClosedException)
+        {
+            return Conflict(new { code = "SERVICE_CLOSED" });
         }
     }
 

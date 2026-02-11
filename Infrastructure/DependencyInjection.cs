@@ -1,4 +1,5 @@
-﻿using BarTasca.Services.Interfaces;
+﻿using BarTasca.Infrastructure.Notifications;
+using BarTasca.Services.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.DependencyInjection;
 
@@ -14,8 +15,15 @@ public static class DependencyInjection
         where THub : Hub
     {
         // SignalRNotificationService como implementación de INotificationService
-        services.AddScoped<INotificationService, Notifications.SignalRNotificationService<THub>>();
+        services.AddScoped<INotificationService, SignalRNotificationService<THub>>();
 
+        return services;
+    }
+
+    public static IServiceCollection AddPublicInfrastructure<THub>(this IServiceCollection services)
+        where THub : Hub
+    {
+        services.AddScoped<ISignalRPublicNotificationService, SignalRPublicNotificationService<THub>>();
         return services;
     }
 }
