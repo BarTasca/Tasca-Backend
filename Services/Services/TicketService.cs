@@ -5,6 +5,7 @@ using BarTasca.Models;
 using BarTasca.Services.Interfaces;
 using BarTasca.Services.Exceptions;
 using Microsoft.Extensions.Logging;
+using BarTasca.DTOs.Queue;
 
 namespace BarTasca.Services.Services;
 
@@ -14,10 +15,11 @@ public class TicketService : ITicketService
     private readonly ITicketRepository _tickets;
     private readonly IMapper _mapper;
     private readonly INotificationService _notificationService;
+    private readonly ISignalRPublicNotificationService _publicSignalR;
     private readonly IServiceStateService _serviceStateService;
     private readonly ILogger<TicketService> _logger;
 
-    public TicketService(ICustomerRepository customers, ITicketRepository tickets, IMapper mapper, INotificationService notificationService, IServiceStateService serviceStateService, ILogger<TicketService> logger)
+    public TicketService(ICustomerRepository customers, ITicketRepository tickets, IMapper mapper, INotificationService notificationService, IServiceStateService serviceStateService, ILogger<TicketService> logger, ISignalRPublicNotificationService publicSignalR)
     {
         _customers = customers;
         _tickets = tickets;
@@ -25,6 +27,7 @@ public class TicketService : ITicketService
         _notificationService = notificationService;
         _serviceStateService = serviceStateService;
         _logger = logger;
+        _publicSignalR = publicSignalR;
     }
 
     public async Task<TicketDetailDto> CreateAsync(CreateTicketDto dto, CancellationToken ct = default)
@@ -69,6 +72,7 @@ public class TicketService : ITicketService
 
         await _tickets.AddAsync(ticket, ct);
         await _tickets.SaveChangesAsync(ct);
+        await BroadcastPublicAheadAsync(ct);
 
         var ahead = await _tickets.CountAheadAsync(ticket.Id, ct);
 
@@ -149,6 +153,9 @@ public class TicketService : ITicketService
         var ticket = await _tickets.GetByIdAsync(id, ct);
         if (ticket is null) return null;
 
+        bool wasActive = ticket.Status == TicketStatus.Waiting || ticket.Status == TicketStatus.Notified;
+        bool becomesInactive = target == TicketStatus.Confirmed || target == TicketStatus.Skipped || target == TicketStatus.Cancelled;
+
         var isActive = ticket.Status == TicketStatus.Waiting || ticket.Status == TicketStatus.Notified;
 
         if (!isActive && ticket.Status != target)
@@ -160,6 +167,11 @@ public class TicketService : ITicketService
             if (setConfirmedAt) ticket.ConfirmedAt = DateTime.UtcNow;
             _tickets.Update(ticket);
             await _tickets.SaveChangesAsync(ct);
+
+            if (wasActive && becomesInactive)
+            {
+                await BroadcastPublicAheadAsync(ct);
+            }
         }
 
         var aheadSelf = await _tickets.CountAheadAsync(ticket.Id, ct);
@@ -253,5 +265,50 @@ public class TicketService : ITicketService
             CreatedAt = ticket.CreatedAt,
             NotifiedAt = ticket.NotifiedAt
         };
+    }
+
+    public async Task<QueueAheadDto> GetAheadAsync(CancellationToken ct = default)
+    {
+        var state = await _serviceStateService.GetAsync(ct);
+        if (!state.IsOpen)
+        {
+            return new QueueAheadDto
+            {
+                IsOpen = false,
+                Ahead = 0
+            };
+        }
+
+        var ahead = await _tickets.CountActiveAsync(ct);
+
+        return new QueueAheadDto
+        {
+            IsOpen = true,
+            Ahead = ahead
+        };
+    }
+
+    private async Task BroadcastPublicAheadAsync(CancellationToken ct)
+    {
+        var state = await _serviceStateService.GetAsync(ct);
+
+        if (!state.IsOpen)
+        {
+            await _publicSignalR.BroadcastAheadUpdatedAsync(new QueueAheadDto
+            {
+                IsOpen = false,
+                Ahead = 0
+            }, ct);
+
+            return;
+        }
+
+        var active = await _tickets.CountActiveAsync(ct);
+
+        await _publicSignalR.BroadcastAheadUpdatedAsync(new QueueAheadDto
+        {
+            IsOpen = true,
+            Ahead = active
+        }, ct);
     }
 }
