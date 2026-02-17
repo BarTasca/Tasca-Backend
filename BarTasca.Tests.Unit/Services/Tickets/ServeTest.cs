@@ -1,11 +1,14 @@
 ﻿using AutoMapper;
 using BarTasca.Data.Interfaces;
+using BarTasca.DTOs.Queue;
+using BarTasca.DTOs.ServiceState;
 using BarTasca.DTOs.Ticket;
 using BarTasca.Models;
 using BarTasca.Services.Interfaces;
 using BarTasca.Services.Services;
 using Bogus;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace BarTasca.Tests.Unit.Services.Tickets
@@ -17,6 +20,8 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         private readonly INotificationService _notifications = Substitute.For<INotificationService>();
         private readonly IServiceStateService _serviceState = Substitute.For<IServiceStateService>();
         private readonly IMapper _mapper = Substitute.For<IMapper>();
+        private readonly ILogger<TicketService> _logger = Substitute.For<ILogger<TicketService>>();
+        private readonly ISignalRPublicNotificationService _publicSignalR = Substitute.For<ISignalRPublicNotificationService>();
 
         private readonly Faker _faker = new("es");
 
@@ -48,7 +53,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task ServeAsync_ticket_not_found_returns_null_and_does_nothing_else()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
             var ticketId = 1;
             _tickets.GetByIdAsync(ticketId, Arg.Any<CancellationToken>())
                     .Returns(Task.FromResult<Ticket?>(null));
@@ -66,7 +71,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task ServeAsync_valid_transition_updates_status_sets_confirmedat_and_saves_changes()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
 
             var ticketId = 1;
             var ticket = new Ticket
@@ -76,12 +81,22 @@ namespace BarTasca.Tests.Unit.Services.Tickets
                 Position = 1,
                 Customer = new Customer { FullName = "John Doe" }
             };
+            var queueAheadDto = new QueueAheadDto
+            {
+                IsOpen = true,
+                Ahead = 0
+            };
 
             _tickets.GetByIdAsync(ticketId, Arg.Any<CancellationToken>())
                     .Returns(ticket);
 
             _tickets.SaveChangesAsync(Arg.Any<CancellationToken>())
                     .Returns(1);
+
+            _serviceState.GetAsync(Arg.Any<CancellationToken>()).Returns(new ServiceStateDto { IsOpen = true, UpdatedAt = DateTime.UtcNow });
+
+            _publicSignalR.BroadcastAheadUpdatedAsync(queueAheadDto, Arg.Any<CancellationToken>())
+                .Returns(Task.CompletedTask);
 
             _tickets.CountAheadAsync(ticketId, Arg.Any<CancellationToken>())
                     .Returns(0);
@@ -119,7 +134,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task ServeAsync_invalid_transition_from_inactive_status_throws_invalidoperationexception()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
             var ticketId = 1;
 
             var ticket = new Ticket
@@ -156,7 +171,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task ServeAsync_ticket_already_confirmed_does_not_save_changes_but_still_broadcasts_update()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
             var ticketId = 1;
             var ticket = new Ticket
             {
@@ -182,13 +197,12 @@ namespace BarTasca.Tests.Unit.Services.Tickets
                 .NotifyTicketUpdatedAsync(Arg.Any<Ticket>(), Arg.Any<int>(), Arg.Any<NotificationType>(), Arg.Any<CancellationToken>());
         }
 
-        //------------------------------Revisar----------------------------
 
         // If affected ticket reaches ahead=3, sends Reminder notification
         [Fact]
         public async Task ServeAsync_affected_ticket_reaches_ahead_3_sends_reminder_notification()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
 
             var ticketId = 1;
             var ticket = new Ticket
@@ -198,12 +212,22 @@ namespace BarTasca.Tests.Unit.Services.Tickets
                 Position = 1,
                 Customer = new Customer { FullName = "John Doe" }
             };
+            var queueAheadDto = new QueueAheadDto
+            {
+                IsOpen = true,
+                Ahead = 0
+            };
 
             _tickets.GetByIdAsync(ticketId, Arg.Any<CancellationToken>())
                     .Returns(ticket);
 
             _tickets.SaveChangesAsync(Arg.Any<CancellationToken>())
                     .Returns(1);
+            _serviceState.GetAsync(Arg.Any<CancellationToken>()).Returns(new ServiceStateDto { IsOpen = true, UpdatedAt = DateTime.UtcNow });
+
+            _publicSignalR.BroadcastAheadUpdatedAsync(queueAheadDto, Arg.Any<CancellationToken>())
+                .Returns(Task.CompletedTask);
+
 
             _tickets.CountAheadAsync(ticketId, Arg.Any<CancellationToken>())
                     .Returns(0);
@@ -258,7 +282,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task ServeAsync_affected_ticket_reaches_ahead_leq_1_updates_to_notified_if_needed_and_sends_turn_notification()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
 
             var ticketId = 1;
             var ticket = new Ticket
@@ -268,12 +292,22 @@ namespace BarTasca.Tests.Unit.Services.Tickets
                 Position = 1,
                 Customer = new Customer { FullName = "John Doe" }
             };
+            var queueAheadDto = new QueueAheadDto 
+            { 
+                IsOpen = true,
+                Ahead = 0
+            };
 
             _tickets.GetByIdAsync(ticketId, Arg.Any<CancellationToken>())
                     .Returns(ticket);
 
             _tickets.SaveChangesAsync(Arg.Any<CancellationToken>())
                     .Returns(1);
+
+            _serviceState.GetAsync(Arg.Any<CancellationToken>()).Returns(new ServiceStateDto { IsOpen = true, UpdatedAt = DateTime.UtcNow });
+
+            _publicSignalR.BroadcastAheadUpdatedAsync(queueAheadDto, Arg.Any<CancellationToken>())
+                .Returns(Task.CompletedTask);
 
             _tickets.CountAheadAsync(ticketId, Arg.Any<CancellationToken>())
                     .Returns(0);
@@ -331,7 +365,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task ServeAsync_affected_ticket_doesnt_hit_thresholds_broadcasts_update_only()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
 
             var ticketId = 1;
             var ticket = new Ticket
@@ -341,12 +375,22 @@ namespace BarTasca.Tests.Unit.Services.Tickets
                 Position = 1,
                 Customer = new Customer { FullName = "John Doe" }
             };
+            var queueAheadDto = new QueueAheadDto
+            {
+                IsOpen = true,
+                Ahead = 0
+            };
 
             _tickets.GetByIdAsync(ticketId, Arg.Any<CancellationToken>())
                     .Returns(ticket);
 
             _tickets.SaveChangesAsync(Arg.Any<CancellationToken>())
                     .Returns(1);
+
+            _serviceState.GetAsync(Arg.Any<CancellationToken>()).Returns(new ServiceStateDto { IsOpen = true, UpdatedAt = DateTime.UtcNow });
+
+            _publicSignalR.BroadcastAheadUpdatedAsync(queueAheadDto, Arg.Any<CancellationToken>())
+                .Returns(Task.CompletedTask);
 
             _tickets.CountAheadAsync(ticketId, Arg.Any<CancellationToken>())
                     .Returns(0);
