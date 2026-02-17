@@ -30,7 +30,11 @@ builder.Services.AddCors(options =>
 {
     // DEV: localhost
     options.AddPolicy("DevFront", p =>
-        p.WithOrigins("http://localhost:5173", "http://localhost:5174")
+        p.WithOrigins(
+            "http://localhost:5173",
+            "http://localhost:5174",
+            "http://192.168.1.133:5173"
+            )
          .AllowAnyHeader()
          .AllowAnyMethod()
          .AllowCredentials());
@@ -139,6 +143,9 @@ builder.Services.AddRepositories();
 builder.Services.AddAutoMapper(cfg => cfg.AddProfile<TicketMappingProfile>());
 builder.Services.AddAutoMapper(cfg => cfg.AddProfile<ServiceStateMappingProfile>());
 builder.Services.AddApplicationServices();
+
+//Options
+builder.Services.Configure<QrOptions>(builder.Configuration.GetSection("Qr"));
 
 // SignalR + Infrastructure
 builder.Services.AddApiLayer();

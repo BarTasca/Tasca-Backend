@@ -6,6 +6,7 @@ using BarTasca.Services.Interfaces;
 using BarTasca.Services.Services;
 using Bogus;
 using FluentAssertions;
+using Microsoft.Extensions.Logging;
 using NSubstitute;
 
 namespace BarTasca.Tests.Unit.Services.Tickets
@@ -17,6 +18,8 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         private readonly INotificationService _notifications = Substitute.For<INotificationService>();
         private readonly IServiceStateService _serviceState = Substitute.For<IServiceStateService>();
         private readonly IMapper _mapper = Substitute.For<IMapper>();
+        private readonly ILogger<TicketService> _logger = Substitute.For<ILogger<TicketService>>();
+        private readonly ISignalRPublicNotificationService _publicSignalR = Substitute.For<ISignalRPublicNotificationService>();
 
         private readonly Faker _faker = new("es");
 
@@ -48,7 +51,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task GetStatusAsync_TicketNotFound_ReturnsNull()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
             var publicId = "test-public-id";
             var ct = new CancellationTokenSource().Token;
             _tickets.GetByPublicIdAsync(publicId, ct)
@@ -64,7 +67,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task GetStatusAsync_TicketFound_ReturnsDtoWithCorrectProperties()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
             var publicId = "test-public-id";
             var ct = new CancellationTokenSource().Token;
             var ticket = new Ticket
@@ -99,7 +102,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task GetStatusAsync_TicketWithNullNotifiedAt_ReturnsDtoWithNullNotifiedAt()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
             var publicId = "test-public-id";
             var ct = new CancellationTokenSource().Token;
             var ticket = new Ticket
@@ -128,7 +131,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task GetStatusAsync_RepositoryCalledWithCorrectParameters()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
             var publicId = "test-public-id";
             var ct = new CancellationTokenSource().Token;
             _tickets.GetByPublicIdAsync(publicId, ct)

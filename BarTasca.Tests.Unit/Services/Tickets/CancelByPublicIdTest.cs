@@ -5,8 +5,13 @@ using BarTasca.Models;
 using BarTasca.Services.Interfaces;
 using BarTasca.Services.Services;
 using Bogus;
+using Castle.Core.Logging;
 using FluentAssertions;
 using NSubstitute;
+using Microsoft.Extensions.Logging;
+using BarTasca.DTOs.Queue;
+using BarTasca.DTOs.ServiceState;
+
 
 namespace BarTasca.Tests.Unit.Services.Tickets
 {
@@ -17,6 +22,10 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         private readonly INotificationService _notifications = Substitute.For<INotificationService>();
         private readonly IServiceStateService _serviceState = Substitute.For<IServiceStateService>();
         private readonly IMapper _mapper = Substitute.For<IMapper>();
+        private readonly ILogger<TicketService> _logger = Substitute.For<ILogger<TicketService>>();
+        private readonly ISignalRPublicNotificationService _publicSignalR = Substitute.For<ISignalRPublicNotificationService>();
+
+
 
         private readonly Faker _faker = new("es");
 
@@ -68,7 +77,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task TicketNotFound_ReturnsNull()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
             var ticketPublicId = "test-public-id";
             _tickets.GetByPublicIdAsync(ticketPublicId, Arg.Any<CancellationToken>())
                     .Returns(Task.FromResult<Ticket?>(null));
@@ -84,7 +93,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task TicketFoundAndWaiting_CancelsAndReturnsDto()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
             var ticketPublicId = "test-public-id";
 
             var ticket = new Ticket
@@ -97,12 +106,22 @@ namespace BarTasca.Tests.Unit.Services.Tickets
                 CreatedAt = DateTime.UtcNow.AddMinutes(-10),
                 Customer = new Customer { FullName = "John Doe" }
             };
+            var queueAheadDto = new QueueAheadDto
+            {
+                IsOpen = true,
+                Ahead = 0
+            };
 
             _tickets.GetByPublicIdAsync(ticketPublicId, Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult<Ticket?>(ticket));
 
             _tickets.GetByIdAsync(ticket.Id, Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult<Ticket?>(ticket));
+
+            _serviceState.GetAsync(Arg.Any<CancellationToken>()).Returns(new ServiceStateDto { IsOpen = true, UpdatedAt = DateTime.UtcNow });
+
+            _publicSignalR.BroadcastAheadUpdatedAsync(queueAheadDto, Arg.Any<CancellationToken>())
+                .Returns(Task.CompletedTask);
 
             _tickets.CountAheadAsync(ticket.Id, Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(3));
@@ -132,7 +151,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task InvalidTransitionFromInactiveStatus_ThrowsInvalidOperationException()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
             var ticketPublicId = "test-public-id";
             var target = TicketStatus.Cancelled;
             var ticket = new Ticket

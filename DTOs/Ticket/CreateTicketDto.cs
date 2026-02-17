@@ -12,6 +12,10 @@ namespace BarTasca.DTOs.Ticket
 
         [Range(1, 15)]
         public byte PeopleCount { get; init; }
+
+        [Required]
+        public string QrToken { get; init; } = null!;
+
     }
 
 }

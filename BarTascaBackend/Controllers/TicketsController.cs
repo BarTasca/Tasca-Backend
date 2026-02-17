@@ -14,17 +14,27 @@ public class TicketsController : ControllerBase
 {
     private readonly ITicketService _service;
     private readonly ITicketAuthService _ticketAuth;
+    private readonly IQrTokenService _qr;
 
-    public TicketsController(ITicketService service, ITicketAuthService authService)
+
+    public TicketsController(ITicketService service, ITicketAuthService authService, IQrTokenService qr)
     {
         _service = service;
         _ticketAuth = authService;
+        _qr = qr;
     }
 
     [HttpPost]
     public async Task<ActionResult<TicketDetailDto>> Create([FromBody] CreateTicketDto dto, CancellationToken ct)
     {
         if (!ModelState.IsValid) return ValidationProblem(ModelState);
+
+        var qr = _qr.Validate(dto.QrToken);
+        if (!qr.IsValid)
+        {
+            return StatusCode(410, new { code = "QR_EXPIRED" });
+        }
+
 
         try
         {

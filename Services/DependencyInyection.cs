@@ -1,6 +1,7 @@
 ﻿using BarTasca.Services.Interfaces;
 using BarTasca.Services.Services;
 using Microsoft.Extensions.DependencyInjection;
+using BarTasca.Services.Options;
 
 namespace BarTasca.Services;
 
@@ -12,6 +13,7 @@ public static class DependencyInjection
         services.AddScoped<IStaffAuthService, StaffAuthService>();
         services.AddScoped<ITicketAuthService, TicketAuthService>();
         services.AddScoped<IServiceStateService, ServiceStateService>();
+        services.AddScoped<IQrTokenService, QrTokenService>();
         return services;
     }
 }
