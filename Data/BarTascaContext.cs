@@ -16,6 +16,7 @@ public class ColaDbContext : DbContext
     public DbSet<Notification> Notifications => Set<Notification>();
     public DbSet<StaffUser> StaffUsers => Set<StaffUser>();
     public DbSet<ServiceState> ServiceStates => Set<ServiceState>();
+    public DbSet<PushSubscription> PushSubscriptions => Set<PushSubscription>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -51,6 +52,37 @@ public class ColaDbContext : DbContext
         modelBuilder.Entity<ServiceState>()
             .Property(e => e.RowVersion)
             .IsRowVersion();
+
+        // Configuración de PushSubscription
+        modelBuilder.Entity<PushSubscription>()
+            .HasOne(ps => ps.Ticket)
+            .WithMany()
+            .HasForeignKey(ps => ps.TicketId)
+            .OnDelete(DeleteBehavior.Cascade);
+
+        modelBuilder.Entity<PushSubscription>()
+            .Property(ps => ps.Endpoint)
+            .HasMaxLength(2048);
+
+        modelBuilder.Entity<PushSubscription>()
+            .Property(ps => ps.EndpointHash)
+            .HasColumnType("binary(32)")
+            .IsRequired();
+
+        modelBuilder.Entity<PushSubscription>()
+            .HasIndex(ps => ps.EndpointHash)
+            .IsUnique();
+
+        modelBuilder.Entity<PushSubscription>()
+            .HasIndex(ps => new { ps.TicketId, ps.IsActive });
+
+        modelBuilder.Entity<PushSubscription>()
+            .Property(ps => ps.P256dh)
+            .HasMaxLength(256);
+
+        modelBuilder.Entity<PushSubscription>()
+            .Property(ps => ps.Auth)
+            .HasMaxLength(256);
     }
 
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)

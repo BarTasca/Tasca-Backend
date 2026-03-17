@@ -63,6 +63,7 @@ var jwt = new JwtOptions
 builder.Services.AddSingleton<IOptions<JwtOptions>>(Options.Create(jwt));
 var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Secret));
 
+// Twilio config
 var twilio = new TwilioOptions
 {
     Sid = EnvOrThrow("TWILIO_SID"),
@@ -76,6 +77,19 @@ if (twilio.Enabled)
 {
     Twilio.TwilioClient.Init(twilio.Sid!, twilio.Token!);
 }
+
+// WebPush config
+static string? EnvOrNull(string key) => Environment.GetEnvironmentVariable(key);
+
+var webPush = new WebPushOptions
+{
+    VapidPublicKey = EnvOrNull("WEBPUSH_VAPID_PUBLIC_KEY"),
+    VapidPrivateKey = EnvOrNull("WEBPUSH_VAPID_PRIVATE_KEY"),
+    Subject = EnvOrNull("WEBPUSH_SUBJECT"),
+    PublicAppBaseUrl = EnvOrNull("PUBLIC_APP_BASE_URL"),
+};
+
+builder.Services.AddSingleton<IOptions<WebPushOptions>>(Options.Create(webPush));
 
 // Autenticación JWT
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)

@@ -21,6 +21,8 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         private readonly IMapper _mapper = Substitute.For<IMapper>();
         private readonly ILogger<TicketService> _logger = Substitute.For<ILogger<TicketService>>();
         private readonly ISignalRPublicNotificationService _publicSignalR = Substitute.For<ISignalRPublicNotificationService>();
+        private readonly IPushSubscriptionService _pushSubs = Substitute.For<IPushSubscriptionService>();
+
 
         private readonly Faker _faker = new("es");
 
@@ -51,7 +53,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         //Early return if an active ticket exists
         public async Task Existing_active_ticket_returns_existing_without_creating_or_notifying()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
 
             var phone = "600999888";
             var existing = new Ticket
@@ -105,7 +107,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         //A: New customer
         public async Task New_customer_without_active_ticket_creates_customer_and_ticket_and_notifies_created()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
 
             var dto = new CreateTicketDto
             {
@@ -179,7 +181,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         //B: Existing customer
         public async Task Existing_customer_without_active_ticket_creates_new_ticket()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
 
             var phone = "600555444";
             var existingCustomer = new Customer { Id = 77, FullName = "Cliente Conocido", Phone = phone };
@@ -242,7 +244,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task Created_ticket_with_normal_position()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
             var dto = new CreateTicketDto
             {
                 FullName = _faker.Person.FullName,
@@ -285,7 +287,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task Created_ticket_with_position_zero()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
             var dto = new CreateTicketDto
             {
                 FullName = _faker.Person.FullName,
@@ -328,7 +330,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task Created_ticket_with_ahead_three()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
             var dto = new CreateTicketDto
             {
                 FullName = _faker.Person.FullName,
@@ -373,7 +375,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task Created_ticket_with_ahead_one()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
             var dto = new CreateTicketDto
             {
                 FullName = _faker.Person.FullName,
@@ -417,7 +419,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task Created_ticket_with_ahead_zero()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
             var dto = new CreateTicketDto
             {
                 FullName = _faker.Person.FullName,
@@ -466,7 +468,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
             var notifications = Substitute.For<INotificationService>();
             var serviceState = Substitute.For<IServiceStateService>();
             var mapper = Substitute.For<IMapper>();
-            var svc = new TicketService(customers, tickets, mapper, notifications, serviceState, _logger, _publicSignalR);
+            var svc = new TicketService(customers, tickets, mapper, notifications, serviceState, _logger, _publicSignalR, _pushSubs);
             var dto = new CreateTicketDto
             {
                 FullName = _faker.Person.FullName,
@@ -496,7 +498,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task Service_open_allows_ticket_creation()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
             var dto = new CreateTicketDto
             {
                 FullName = _faker.Person.FullName,
@@ -536,7 +538,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task Service_closed_with_existing_active_ticket_returns_existing()
         {
-            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var svc = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
             var phone = "600999888";
             var existing = new Ticket
             {

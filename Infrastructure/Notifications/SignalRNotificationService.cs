@@ -4,13 +4,15 @@ using AutoMapper;
 using BarTasca.Data.Interfaces;
 using BarTasca.DTOs.Ticket;
 using Microsoft.Extensions.Options;
-using BarTasca.Infrastructure.Options;
+//using BarTasca.Infrastructure.Options;
 using BarTasca.Models;
 using BarTasca.Services.Interfaces;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
-using Twilio;
-using Twilio.Rest.Api.V2010.Account;
+using BarTasca.Services.Options;
+
+//using Twilio;
+//using Twilio.Rest.Api.V2010.Account;
 
 public class SignalRNotificationService<THub> : INotificationService where THub : Hub
 {
@@ -18,27 +20,40 @@ public class SignalRNotificationService<THub> : INotificationService where THub 
     private readonly IMapper _mapper;
     private readonly INotificationRepository _notifications;
     private readonly ILogger<SignalRNotificationService<THub>> _logger;
+
     private const string StaffGroup = "staff";
 
-    private readonly bool _smsEnabled;
-    private readonly string? _twilioFrom;
+    //private readonly bool _smsEnabled;
+    //private readonly string? _twilioFrom;
+
+    private readonly IPushSubscriptionRepository _pushSubs;
+    private readonly IWebPushSender _webPushSender;
+    private readonly WebPushOptions _webPushOptions;
 
     public SignalRNotificationService(
         IHubContext<THub> hub,
         IMapper mapper,
         INotificationRepository notifications,
         ILogger<SignalRNotificationService<THub>> logger,
-        IOptions<TwilioOptions> twilioOptions)
+        IPushSubscriptionRepository pushSubs,
+        IWebPushSender webPushSender,
+        IOptions<WebPushOptions> webPushOptions
+        //IOptions<TwilioOptions> twilioOptions
+        )
     {
         _hub = hub;
         _mapper = mapper;
         _notifications = notifications;
         _logger = logger;
+        _pushSubs = pushSubs;
+        _webPushSender = webPushSender;
+        _webPushOptions = webPushOptions?.Value ?? throw new InvalidOperationException("WebPush options not set");
 
-        var tw = twilioOptions?.Value ?? throw new InvalidOperationException("Twilio options not set");
 
-        _smsEnabled = tw.Enabled;
-        _twilioFrom = tw.From;
+        //var tw = twilioOptions?.Value ?? throw new InvalidOperationException("Twilio options not set");
+
+        //_smsEnabled = tw.Enabled;
+        //_twilioFrom = tw.From;
     }
 
     public async Task NotifyTicketCreatedAsync(Ticket ticket, int ahead, CancellationToken ct = default)
@@ -128,38 +143,78 @@ public class SignalRNotificationService<THub> : INotificationService where THub 
             await _notifications.SaveChangesAsync(ct);
         }
 
-        if (!_smsEnabled) return;
+        //    if (!_smsEnabled) return;
+
+        //    switch (type)
+        //    {
+        //        case NotificationType.Reminder:
+        //            {
+        //                // Solo si no existe ya Reminder
+        //                var already = await _notifications.ExistsSentAsync(ticket.Id, NotificationType.Reminder, NotificationChannel.Sms, ct);
+        //                if (!already)
+        //                {
+        //                    await SendSmsAndPersistAsync(ticket, NotificationType.Reminder, BuildReminderMessage(ticket, ahead), ct);
+        //                }
+        //                break;
+        //            }
+        //        case NotificationType.Turn:
+        //            {
+        //                // Nunca SMS en Turn
+        //                break;
+        //            }
+        //        case NotificationType.Manual:
+        //            {
+        //                // Siempre SMS para Manual
+        //                var window = TimeSpan.FromMinutes(5);
+        //                if (!await _notifications.WasSentRecentlyAsync(ticket.Id, NotificationType.Manual, NotificationChannel.Sms, window, ct))
+        //                {
+        //                    await SendSmsAndPersistAsync(ticket, NotificationType.Manual, BuildManualMessage(ticket, ahead), ct);
+        //                }
+        //                else
+        //                {
+        //                    _logger.LogInformation("Manual SMS rate limit: ticketId={TicketId}", ticket.Id);
+        //                }
+        //                    break;
+        //            }
+        //    }
+        //}
+
+        if (!_webPushOptions.Enabled) return;
 
         switch (type)
         {
             case NotificationType.Reminder:
                 {
-                    // Solo si no existe ya Reminder
-                    var already = await _notifications.ExistsSentAsync(ticket.Id, NotificationType.Reminder, NotificationChannel.Sms, ct);
+                    var already = await _notifications.ExistsSentAsync(ticket.Id, NotificationType.Reminder, NotificationChannel.WebPush, ct);
                     if (!already)
                     {
-                        await SendSmsAndPersistAsync(ticket, NotificationType.Reminder, BuildReminderMessage(ticket, ahead), ct);
+                        await SendWebPushAndPersistAsync(ticket, ahead, NotificationType.Reminder, ct);
                     }
                     break;
                 }
+
             case NotificationType.Turn:
                 {
-                    // Nunca SMS en Turn
+                    var already = await _notifications.ExistsSentAsync(ticket.Id, NotificationType.Turn, NotificationChannel.WebPush, ct);
+                    if (!already)
+                    {
+                        await SendWebPushAndPersistAsync(ticket, ahead, NotificationType.Turn, ct);
+                    }
                     break;
                 }
+
             case NotificationType.Manual:
                 {
-                    // Siempre SMS para Manual
                     var window = TimeSpan.FromMinutes(5);
-                    if (!await _notifications.WasSentRecentlyAsync(ticket.Id, NotificationType.Manual, NotificationChannel.Sms, window, ct))
+                    if (!await _notifications.WasSentRecentlyAsync(ticket.Id, NotificationType.Manual, NotificationChannel.WebPush, window, ct))
                     {
-                        await SendSmsAndPersistAsync(ticket, NotificationType.Manual, BuildManualMessage(ticket, ahead), ct);
+                        await SendWebPushAndPersistAsync(ticket, ahead, NotificationType.Manual, ct);
                     }
                     else
                     {
-                        _logger.LogInformation("Manual SMS rate limit: ticketId={TicketId}", ticket.Id);
+                        _logger.LogInformation("Manual WebPush rate limit: ticketId={TicketId}", ticket.Id);
                     }
-                        break;
+                    break;
                 }
         }
     }
@@ -198,71 +253,149 @@ public class SignalRNotificationService<THub> : INotificationService where THub 
         }
     }
 
-    private static string BuildReminderMessage(Ticket ticket, int ahead)
-        => $"Bar La Tasca: quedan {ahead} por delante. Ticket #{ticket.Position} (personas: {ticket.PeopleCount}). Ves vieniendo y que aproveche.";
+    //private static string BuildReminderMessage(Ticket ticket, int ahead)
+    //    => $"Bar La Tasca: quedan {ahead} por delante. Ticket #{ticket.Position} (personas: {ticket.PeopleCount}). Ves vieniendo y que aproveche.";
 
-    private static string BuildManualMessage(Ticket ticket, int ahead)
-        => $"Bar La Tasca: actualización de tu ticket #{ticket.Position}. Quedan {ahead} por delante. Ves vieniendo y que aproveche.";
+    //private static string BuildManualMessage(Ticket ticket, int ahead)
+    //    => $"Bar La Tasca: actualización de tu ticket #{ticket.Position}. Quedan {ahead} por delante. Ves vieniendo y que aproveche.";
 
-    private async Task SendSmsAndPersistAsync(Ticket ticket, NotificationType type, string body, CancellationToken ct)
+    //private async Task SendSmsAndPersistAsync(Ticket ticket, NotificationType type, string body, CancellationToken ct)
+    //{
+    //    var toRaw = ticket.Customer?.Phone;
+    //    var toNorm = NormalizePhone(toRaw);
+
+    //    if (!IsE164(toNorm))
+    //    {
+    //        _logger.LogWarning("Invalid phone number for SMS: ticketId={TicketId} phone={Phone}", ticket.Id, toNorm ?? "<null>");
+
+    //        await _notifications.AddAsync(new Notification
+    //        {
+    //            TicketId = ticket.Id,
+    //            Channel = NotificationChannel.Sms,
+    //            Type = type,
+    //            Status = NotificationStatus.Failed,
+    //            SentAt = DateTime.UtcNow
+    //        }, ct);
+    //        await _notifications.SaveChangesAsync(ct);
+
+    //        return;
+    //    }
+
+    //    NotificationStatus status = NotificationStatus.Sent;
+
+    //    try
+    //    {
+    //        var msg = await MessageResource.CreateAsync(
+    //            to: new Twilio.Types.PhoneNumber(toNorm),
+    //            from: new Twilio.Types.PhoneNumber(_twilioFrom),
+    //            body: body
+    //        );
+    //    }
+    //    catch
+    //    {
+    //        status = NotificationStatus.Failed;
+    //    }
+
+    //    await _notifications.AddAsync(new Notification
+    //    {
+    //        TicketId = ticket.Id,
+    //        Channel = NotificationChannel.Sms,
+    //        Type = type,
+    //        Status = status,
+    //        SentAt = DateTime.UtcNow
+    //    }, ct);
+    //    await _notifications.SaveChangesAsync(ct);
+    //}
+
+    //private static string NormalizePhone(string? input) => string.IsNullOrWhiteSpace(input) ? "" :
+    //input.Trim().Replace(" ", "").Replace("-", "").Replace("(", "").Replace(")", "");
+
+    //private static bool IsE164(string? phone)
+    //{
+    //    phone = NormalizePhone(phone);
+    //    if (string.IsNullOrWhiteSpace(phone)) return false;
+    //    if (!phone.StartsWith("+")) return false;
+    //    for (int i = 1; i < phone.Length; i++)
+    //        if (!char.IsDigit(phone[i])) return false;
+    //    return phone.Length >= 8 && phone.Length <= 16;
+    //}
+
+    private WebPushPayload BuildPayload(Ticket ticket, int ahead, NotificationType type)
     {
-        var toRaw = ticket.Customer?.Phone;
-        var toNorm = NormalizePhone(toRaw);
+        var path = $"/ticket/{ticket.PublicId}";
+        var baseUrl = _webPushOptions.PublicAppBaseUrl;
 
-        if (!IsE164(toNorm))
+        var url = string.IsNullOrWhiteSpace(baseUrl)
+            ? path
+            : $"{baseUrl.TrimEnd('/')}{path}";
+
+        return type switch
         {
-            _logger.LogWarning("Invalid phone number for SMS: ticketId={TicketId} phone={Phone}", ticket.Id, toNorm ?? "<null>");
+            NotificationType.Reminder => new WebPushPayload(
+                Title: "Bar La Tasca",
+                Body: $"Quedan {ahead} por delante. Ticket #{ticket.Position} (personas: {ticket.PeopleCount}).",
+                Url: url,
+                Type: "reminder"),
 
+            NotificationType.Turn => new WebPushPayload(
+                Title: "Bar La Tasca",
+                Body: $"¡Te toca! Ticket #{ticket.Position}. Pásate por la barra.",
+                Url: url,
+                Type: "turn"),
+
+            NotificationType.Manual => new WebPushPayload(
+                Title: "Bar La Tasca",
+                Body: $"Actualización de tu ticket #{ticket.Position}. Quedan {ahead} por delante.",
+                Url: url,
+                Type: "manual"),
+
+            _ => new WebPushPayload("Bar La Tasca", "Actualización de tu ticket.", url, "unknown")
+        };
+    }
+
+    private async Task SendWebPushAndPersistAsync(Ticket ticket, int ahead, NotificationType type, CancellationToken ct)
+    {
+        var subs = await _pushSubs.ListActiveByTicketIdAsync(ticket.Id, ct);
+        if (subs.Count == 0)
+        {
             await _notifications.AddAsync(new Notification
             {
                 TicketId = ticket.Id,
-                Channel = NotificationChannel.Sms,
+                Channel = NotificationChannel.WebPush,
                 Type = type,
                 Status = NotificationStatus.Failed,
                 SentAt = DateTime.UtcNow
             }, ct);
-            await _notifications.SaveChangesAsync(ct);
 
+            await _notifications.SaveChangesAsync(ct);
             return;
         }
 
-        NotificationStatus status = NotificationStatus.Sent;
+        var payload = BuildPayload(ticket, ahead, type);
+        var result = await _webPushSender.SendAsync(subs, payload, ct);
 
-        try
+        if (result.InvalidEndpointHashes.Count > 0)
         {
-            var msg = await MessageResource.CreateAsync(
-                to: new Twilio.Types.PhoneNumber(toNorm),
-                from: new Twilio.Types.PhoneNumber(_twilioFrom),
-                body: body
-            );
+            foreach (var h in result.InvalidEndpointHashes)
+            {
+                await _pushSubs.DeactivateByEndpointHashAsync(h, ct);
+            }
+
+            await _pushSubs.SaveChangesAsync(ct);
         }
-        catch
-        {
-            status = NotificationStatus.Failed;
-        }
+
+        var status = result.Sent > 0 ? NotificationStatus.Sent : NotificationStatus.Failed;
 
         await _notifications.AddAsync(new Notification
         {
             TicketId = ticket.Id,
-            Channel = NotificationChannel.Sms,
+            Channel = NotificationChannel.WebPush,
             Type = type,
             Status = status,
             SentAt = DateTime.UtcNow
         }, ct);
+
         await _notifications.SaveChangesAsync(ct);
-    }
-
-    private static string NormalizePhone(string? input) => string.IsNullOrWhiteSpace(input) ? "" :
-    input.Trim().Replace(" ", "").Replace("-", "").Replace("(", "").Replace(")", "");
-
-    private static bool IsE164(string? phone)
-    {
-        phone = NormalizePhone(phone);
-        if (string.IsNullOrWhiteSpace(phone)) return false;
-        if (!phone.StartsWith("+")) return false;
-        for (int i = 1; i < phone.Length; i++)
-            if (!char.IsDigit(phone[i])) return false;
-        return phone.Length >= 8 && phone.Length <= 16;
     }
 
 }

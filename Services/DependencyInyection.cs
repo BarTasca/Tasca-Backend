@@ -14,6 +14,7 @@ public static class DependencyInjection
         services.AddScoped<ITicketAuthService, TicketAuthService>();
         services.AddScoped<IServiceStateService, ServiceStateService>();
         services.AddScoped<IQrTokenService, QrTokenService>();
+        services.AddScoped<IPushSubscriptionService, PushSubscriptionService>();
         return services;
     }
 }
