@@ -13,6 +13,7 @@ public static class DependencyInjection
         services.AddScoped<IStaffUserRepository, StaffUserRepository>();
         services.AddScoped<INotificationRepository, NotificationRepository>();
         services.AddScoped<IServiceStateRepository, ServiceStateRepository>();
+        services.AddScoped<IPushSubscriptionRepository, PushSubscriptionRepository>();
         return services;
     }
 }

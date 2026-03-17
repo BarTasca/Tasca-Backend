@@ -12,7 +12,8 @@ public enum TicketStatus
 public enum NotificationChannel
 {
     SignalR,
-    Sms
+    Sms,
+    WebPush
 }
 
 public enum NotificationType

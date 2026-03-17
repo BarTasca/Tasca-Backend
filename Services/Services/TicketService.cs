@@ -18,8 +18,9 @@ public class TicketService : ITicketService
     private readonly ISignalRPublicNotificationService _publicSignalR;
     private readonly IServiceStateService _serviceStateService;
     private readonly ILogger<TicketService> _logger;
+    private readonly IPushSubscriptionService _pushSubs;
 
-    public TicketService(ICustomerRepository customers, ITicketRepository tickets, IMapper mapper, INotificationService notificationService, IServiceStateService serviceStateService, ILogger<TicketService> logger, ISignalRPublicNotificationService publicSignalR)
+    public TicketService(ICustomerRepository customers, ITicketRepository tickets, IMapper mapper, INotificationService notificationService, IServiceStateService serviceStateService, ILogger<TicketService> logger, ISignalRPublicNotificationService publicSignalR, IPushSubscriptionService pushSubs)
     {
         _customers = customers;
         _tickets = tickets;
@@ -28,6 +29,7 @@ public class TicketService : ITicketService
         _serviceStateService = serviceStateService;
         _logger = logger;
         _publicSignalR = publicSignalR;
+        _pushSubs = pushSubs;
     }
 
     public async Task<TicketDetailDto> CreateAsync(CreateTicketDto dto, CancellationToken ct = default)
@@ -168,8 +170,14 @@ public class TicketService : ITicketService
             _tickets.Update(ticket);
             await _tickets.SaveChangesAsync(ct);
 
+            if (becomesInactive)
+            {
+                await _pushSubs.DeactivateByTicketIdAsync(ticket.Id, ct);
+            }
+
             if (wasActive && becomesInactive)
             {
+                await _pushSubs.DeactivateByTicketIdAsync(ticket.Id, ct);
                 await BroadcastPublicAheadAsync(ct);
             }
         }

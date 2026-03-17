@@ -16,6 +16,7 @@ public static class DependencyInjection
     {
         // SignalRNotificationService como implementación de INotificationService
         services.AddScoped<INotificationService, SignalRNotificationService<THub>>();
+        services.AddScoped<IWebPushSender, WebPushSender>();
 
         return services;
     }

@@ -20,6 +20,8 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         private readonly IMapper _mapper = Substitute.For<IMapper>();
         private readonly ILogger<TicketService> _logger = Substitute.For<ILogger<TicketService>>();
         private readonly ISignalRPublicNotificationService _publicSignalR = Substitute.For<ISignalRPublicNotificationService>();
+        private readonly IPushSubscriptionService _pushSubs = Substitute.For<IPushSubscriptionService>();
+
 
         private readonly Faker _faker = new("es");
 
@@ -51,7 +53,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task StatusWaiting_QueriesWaitingStatus()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
             var tickets = new List<Ticket>
             {
                 new Ticket
@@ -100,7 +102,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task StatusNotified_QueriesNotifiedStatus()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
             var tickets = new List<Ticket>
             {
                 new Ticket
@@ -147,7 +149,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task StatusActive_QueriesWaitingAndNotifiedStatuses()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
             var tickets = new List<Ticket>
             {
                 new Ticket
@@ -194,7 +196,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task StatusUnknown_FallsBackToActive()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
             var tickets = new List<Ticket>
             {
                 new Ticket
@@ -241,7 +243,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task StatusAll_QueriesAllStatuses()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
             var tickets = new List<Ticket>
             {
                 new Ticket
@@ -288,7 +290,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task StatusCaseInsensitive_MapsCorrectly()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
             var tickets = new List<Ticket>
             {
                 new Ticket
@@ -326,7 +328,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task RepositoryReturnsEmptyList_ReturnsEmptyList()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
             _tickets.ListByStatusesAsync(Arg.Any<TicketStatus[]>(), Arg.Any<int>(), Arg.Any<CancellationToken>())
                 .Returns(Task.FromResult(new List<Ticket>()));
             var result = await service.ListForStaffAsync("waiting");
@@ -337,7 +339,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task Mapping_IsCorrect()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
             var tickets = new List<Ticket>
             {
                 new Ticket

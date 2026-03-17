@@ -24,6 +24,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         private readonly IMapper _mapper = Substitute.For<IMapper>();
         private readonly ILogger<TicketService> _logger = Substitute.For<ILogger<TicketService>>();
         private readonly ISignalRPublicNotificationService _publicSignalR = Substitute.For<ISignalRPublicNotificationService>();
+        private readonly IPushSubscriptionService _pushSubs = Substitute.For<IPushSubscriptionService>();
 
 
 
@@ -77,7 +78,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task TicketNotFound_ReturnsNull()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
             var ticketPublicId = "test-public-id";
             _tickets.GetByPublicIdAsync(ticketPublicId, Arg.Any<CancellationToken>())
                     .Returns(Task.FromResult<Ticket?>(null));
@@ -93,7 +94,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task TicketFoundAndWaiting_CancelsAndReturnsDto()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
             var ticketPublicId = "test-public-id";
 
             var ticket = new Ticket
@@ -151,7 +152,7 @@ namespace BarTasca.Tests.Unit.Services.Tickets
         [Fact]
         public async Task InvalidTransitionFromInactiveStatus_ThrowsInvalidOperationException()
         {
-            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR);
+            var service = new TicketService(_customers, _tickets, _mapper, _notifications, _serviceState, _logger, _publicSignalR, _pushSubs);
             var ticketPublicId = "test-public-id";
             var target = TicketStatus.Cancelled;
             var ticket = new Ticket
