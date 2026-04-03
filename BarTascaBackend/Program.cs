@@ -3,6 +3,7 @@ using BarTasca.Data;
 using BarTasca.Infrastructure;
 using BarTasca.Infrastructure.Options;
 using BarTasca.Services;
+using BarTasca.Services.Interfaces;
 using BarTasca.Services.Mapping;
 using BarTasca.Services.Options;
 using BarTascaBackend;
@@ -174,7 +175,7 @@ builder.Services.Configure<QrOptions>(builder.Configuration.GetSection("Qr"));
 builder.Services.AddApiLayer();
 builder.Services.AddSignalR(options =>
 {
-    options.EnableDetailedErrors = true;
+    options.EnableDetailedErrors = builder.Environment.IsDevelopment();
 });
 builder.Services.AddInfrastructure<QueueHub>();
 builder.Services.AddPublicInfrastructure<PublicQueueHub>();
@@ -211,6 +212,9 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ColaDbContext>();
     db.Database.Migrate();
+
+    var initialAdminService = scope.ServiceProvider.GetRequiredService<IInitialAdminService>();
+    await initialAdminService.EnsureInitialAdminAsync();
 }
 
 app.MapGet("/health", () => Results.Ok("Healthy"));

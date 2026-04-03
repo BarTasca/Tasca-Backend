@@ -15,6 +15,7 @@ public static class DependencyInjection
         services.AddScoped<IServiceStateService, ServiceStateService>();
         services.AddScoped<IQrTokenService, QrTokenService>();
         services.AddScoped<IPushSubscriptionService, PushSubscriptionService>();
+        services.AddScoped<IInitialAdminService, InitialAdminService>();
         return services;
     }
 }

@@ -7,6 +7,7 @@ public sealed class TicketStatusDto
     public int Ahead { get; set; }
     public int Position { get; set; }
     public byte PeopleCount { get; set; }
+    
     public DateTime CreatedAt { get; set; }
     public DateTime? NotifiedAt { get; set; }
 }
