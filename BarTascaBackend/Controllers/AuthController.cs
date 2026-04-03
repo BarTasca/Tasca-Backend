@@ -19,11 +19,11 @@ namespace BarTascaBackend.Controllers
             return Ok(res);
         }
 
-        [HttpGet("hash")]
-        public IActionResult GetHash(string password)
-        {
-            var hash = BCrypt.Net.BCrypt.HashPassword(password);
-            return Ok(hash);
-        }
+        //[HttpGet("hash")]
+        //public IActionResult GetHash(string password)
+        //{
+        //    var hash = BCrypt.Net.BCrypt.HashPassword(password);
+        //    return Ok(hash);
+        //}
     }
 }

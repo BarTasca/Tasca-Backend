@@ -22,6 +22,11 @@ public class ColaDbContext : DbContext
     {
         base.OnModelCreating(modelBuilder);
 
+        // Índice único email para StaffUser
+        modelBuilder.Entity<StaffUser>()
+            .HasIndex(u => u.Email)
+            .IsUnique();
+
         // Relación Ticket-Customer
         modelBuilder.Entity<Ticket>()
             .HasOne(t => t.Customer)

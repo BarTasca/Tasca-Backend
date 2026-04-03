@@ -3,6 +3,7 @@ using BarTasca.Data;
 using BarTasca.Infrastructure;
 using BarTasca.Infrastructure.Options;
 using BarTasca.Services;
+using BarTasca.Services.Interfaces;
 using BarTasca.Services.Mapping;
 using BarTasca.Services.Options;
 using BarTascaBackend;
@@ -26,31 +27,40 @@ var builder = WebApplication.CreateBuilder(args);
 builder.WebHost.ConfigureKestrel(o => o.ListenAnyIP(5000));
 
 // CORS
+var prodCorsOrigins = EnvListOrEmpty("CORS_ALLOWED_ORIGINS");
+
+if (!builder.Environment.IsDevelopment() && prodCorsOrigins.Length == 0)
+{
+    throw new InvalidOperationException("CORS_ALLOWED_ORIGINS not set");
+}
+
 builder.Services.AddCors(options =>
 {
-    // DEV: localhost
     options.AddPolicy("DevFront", p =>
         p.WithOrigins(
             "http://localhost:5173",
             "http://localhost:5174",
             "http://192.168.1.133:5173"
-            )
-         .AllowAnyHeader()
-         .AllowAnyMethod()
-         .AllowCredentials());
+        )
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials());
 
     options.AddPolicy("ProdFront", p =>
-        p.WithOrigins(
-            "http://a2bdd34dc023648ce9ab0fc206fe5ba6-b148eaf9597343eb.elb.us-east-1.amazonaws.com",
-            "https://a2bdd34dc023648ce9ab0fc206fe5ba6-b148eaf9597343eb.elb.us-east-1.amazonaws.com")
-         .AllowAnyHeader()
-         .AllowAnyMethod()
-         .AllowCredentials());
+        p.WithOrigins(prodCorsOrigins)
+        .AllowAnyHeader()
+        .AllowAnyMethod()
+        .AllowCredentials());
 });
 
+//Helpers
 static string EnvOrThrow(string key) =>
     Environment.GetEnvironmentVariable(key)
     ?? throw new InvalidOperationException($"{key} not set");
+
+static string[] EnvListOrEmpty(string key) =>
+    (Environment.GetEnvironmentVariable(key) ?? string.Empty)
+        .Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
 // Jwt config
 var jwt = new JwtOptions
@@ -165,7 +175,7 @@ builder.Services.Configure<QrOptions>(builder.Configuration.GetSection("Qr"));
 builder.Services.AddApiLayer();
 builder.Services.AddSignalR(options =>
 {
-    options.EnableDetailedErrors = true;
+    options.EnableDetailedErrors = builder.Environment.IsDevelopment();
 });
 builder.Services.AddInfrastructure<QueueHub>();
 builder.Services.AddPublicInfrastructure<PublicQueueHub>();
@@ -202,6 +212,9 @@ using (var scope = app.Services.CreateScope())
 {
     var db = scope.ServiceProvider.GetRequiredService<ColaDbContext>();
     db.Database.Migrate();
+
+    var initialAdminService = scope.ServiceProvider.GetRequiredService<IInitialAdminService>();
+    await initialAdminService.EnsureInitialAdminAsync();
 }
 
 app.MapGet("/health", () => Results.Ok("Healthy"));
