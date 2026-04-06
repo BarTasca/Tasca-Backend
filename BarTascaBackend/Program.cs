@@ -1,7 +1,6 @@
 using System.Text;
 using BarTasca.Data;
 using BarTasca.Infrastructure;
-using BarTasca.Infrastructure.Options;
 using BarTasca.Services;
 using BarTasca.Services.Interfaces;
 using BarTasca.Services.Mapping;
@@ -12,19 +11,20 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Tokens;
-
-
-try
-{
-    DotNetEnv.Env.Load();
-}
-catch
-{
-    
-}
+using Microsoft.AspNetCore.HttpOverrides;
 
 var builder = WebApplication.CreateBuilder(args);
-builder.WebHost.ConfigureKestrel(o => o.ListenAnyIP(5000));
+
+if (builder.Environment.IsDevelopment())
+{
+    try
+    {
+        DotNetEnv.Env.Load();
+    }
+    catch
+    {
+    }
+}
 
 // CORS
 var prodCorsOrigins = EnvListOrEmpty("CORS_ALLOWED_ORIGINS");
@@ -53,10 +53,13 @@ builder.Services.AddCors(options =>
         .AllowCredentials());
 });
 
-//Helpers
+// Helpers
 static string EnvOrThrow(string key) =>
     Environment.GetEnvironmentVariable(key)
     ?? throw new InvalidOperationException($"{key} not set");
+
+static string? EnvOrNull(string key) =>
+    Environment.GetEnvironmentVariable(key);
 
 static string[] EnvListOrEmpty(string key) =>
     (Environment.GetEnvironmentVariable(key) ?? string.Empty)
@@ -73,24 +76,7 @@ var jwt = new JwtOptions
 builder.Services.AddSingleton<IOptions<JwtOptions>>(Options.Create(jwt));
 var signingKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(jwt.Secret));
 
-// Twilio config
-var twilio = new TwilioOptions
-{
-    Sid = EnvOrThrow("TWILIO_SID"),
-    Token = EnvOrThrow("TWILIO_TOKEN"),
-    From = EnvOrThrow("TWILIO_FROM"),
-};
-
-builder.Services.AddSingleton<IOptions<TwilioOptions>>(Options.Create(twilio));
-
-if (twilio.Enabled)
-{
-    Twilio.TwilioClient.Init(twilio.Sid!, twilio.Token!);
-}
-
 // WebPush config
-static string? EnvOrNull(string key) => Environment.GetEnvironmentVariable(key);
-
 var webPush = new WebPushOptions
 {
     VapidPublicKey = EnvOrNull("WEBPUSH_VAPID_PUBLIC_KEY"),
@@ -100,6 +86,15 @@ var webPush = new WebPushOptions
 };
 
 builder.Services.AddSingleton<IOptions<WebPushOptions>>(Options.Create(webPush));
+
+if (!builder.Environment.IsDevelopment() &&
+    !string.IsNullOrWhiteSpace(webPush.VapidPublicKey) &&
+    !string.IsNullOrWhiteSpace(webPush.VapidPrivateKey) &&
+    !string.IsNullOrWhiteSpace(webPush.Subject) &&
+    string.IsNullOrWhiteSpace(webPush.PublicAppBaseUrl))
+{
+    throw new InvalidOperationException("PUBLIC_APP_BASE_URL not set while WebPush is enabled");
+}
 
 // Autenticación JWT
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -125,10 +120,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             {
                 var accessToken = context.Request.Query["access_token"];
                 var path = context.HttpContext.Request.Path;
+
                 if (!string.IsNullOrEmpty(accessToken) && path.StartsWithSegments("/hubs/queue"))
                 {
                     context.Token = accessToken;
                 }
+
                 return Task.CompletedTask;
             },
 
@@ -142,10 +139,12 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
                 {
                     message = "Unauthorized: token is missing or invalid."
                 });
+
                 return context.Response.WriteAsync(result);
             }
         };
     });
+
 builder.Services.AddAuthorization(options =>
 {
     options.AddPolicy("Staff", policy => policy.RequireRole("Admin", "Worker"));
@@ -168,7 +167,7 @@ builder.Services.AddAutoMapper(cfg => cfg.AddProfile<TicketMappingProfile>());
 builder.Services.AddAutoMapper(cfg => cfg.AddProfile<ServiceStateMappingProfile>());
 builder.Services.AddApplicationServices();
 
-//Options
+// Options
 builder.Services.Configure<QrOptions>(builder.Configuration.GetSection("Qr"));
 
 // SignalR + Infrastructure
@@ -180,21 +179,28 @@ builder.Services.AddSignalR(options =>
 builder.Services.AddInfrastructure<QueueHub>();
 builder.Services.AddPublicInfrastructure<PublicQueueHub>();
 
-
-//Workers
+// Workers
 builder.Services.AddBackgroundWorkers();
 
+builder.Services.Configure<ForwardedHeadersOptions>(options =>
+{
+    options.ForwardedHeaders =
+        ForwardedHeaders.XForwardedFor |
+        ForwardedHeaders.XForwardedProto;
+});
+
 var app = builder.Build();
+
+app.UseForwardedHeaders();
 
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
     app.UseSwaggerUI();
-}
 
-// Sirve archivos estáticos desde wwwroot
-app.UseDefaultFiles();
-app.UseStaticFiles();
+    app.UseDefaultFiles();
+    app.UseStaticFiles();
+}
 
 // app.UseHttpsRedirection();
 
@@ -206,7 +212,6 @@ app.UseAuthorization();
 app.MapControllers();
 app.MapHub<QueueHub>("/hubs/queue");
 app.MapHub<PublicQueueHub>("/hubs/public-queue");
-
 
 using (var scope = app.Services.CreateScope())
 {

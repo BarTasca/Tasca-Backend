@@ -22,20 +22,23 @@ namespace BarTasca.Services.Services
             var adminEmail = Environment.GetEnvironmentVariable("ADMIN_EMAIL");
             var adminPassword = Environment.GetEnvironmentVariable("ADMIN_PASSWORD");
 
-            if (string.IsNullOrWhiteSpace(adminEmail))
-                throw new InvalidOperationException("ADMIN_EMAIL not set");
+            var hasEmail = !string.IsNullOrWhiteSpace(adminEmail);
+            var hasPassword = !string.IsNullOrWhiteSpace(adminPassword);
 
-            if (string.IsNullOrWhiteSpace(adminPassword))
-                throw new InvalidOperationException("ADMIN_PASSWORD not set");
+            if (!hasEmail && !hasPassword)
+                return;
 
-            var existingUser = await _staffUserRepository.GetByEmailAsync(adminEmail, ct);
+            if (!hasEmail || !hasPassword)
+                throw new InvalidOperationException("ADMIN_EMAIL and ADMIN_PASSWORD must both be set together");
+
+            var existingUser = await _staffUserRepository.GetByEmailAsync(adminEmail!, ct);
             if (existingUser is not null)
                 return;
 
             var adminUser = new StaffUser
             {
-                Email = adminEmail,
-                PasswordHash = _staffAuthService.HashPassword(adminPassword),
+                Email = adminEmail!,
+                PasswordHash = _staffAuthService.HashPassword(adminPassword!),
                 Role = StaffRole.Admin,
                 CreatedAt = DateTime.UtcNow
             };
