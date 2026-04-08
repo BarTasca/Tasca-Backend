@@ -1,9 +1,3 @@
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-WORKDIR /app
-ENV ASPNETCORE_ENVIRONMENT=Production
-ENV ASPNETCORE_URLS=http://+:5000
-EXPOSE 5000
-
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 ARG BUILD_CONFIGURATION=Release
 WORKDIR /src
@@ -19,6 +13,7 @@ RUN dotnet publish "./BarTascaBackend.csproj" -c $BUILD_CONFIGURATION -o /app/pu
 
 FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 WORKDIR /app
+ENV ASPNETCORE_ENVIRONMENT=Production
 ENV ASPNETCORE_URLS=http://+:5000
 EXPOSE 5000
 COPY --from=publish /app/publish .

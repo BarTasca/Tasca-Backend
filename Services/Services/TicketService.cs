@@ -271,7 +271,8 @@ public class TicketService : ITicketService
             Position = ticket.Position,
             PeopleCount = ticket.PeopleCount,
             CreatedAt = ticket.CreatedAt,
-            NotifiedAt = ticket.NotifiedAt
+            NotifiedAt = ticket.NotifiedAt,
+            CustomerFullName = ticket.Customer.FullName
         };
     }
 
