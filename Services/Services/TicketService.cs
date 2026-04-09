@@ -34,7 +34,12 @@ public class TicketService : ITicketService
 
     public async Task<TicketDetailDto> CreateAsync(CreateTicketDto dto, CancellationToken ct = default)
     {
-        var existingActive = await _tickets.GetActiveByPhoneAsync(dto.Phone, ct);
+        var fullName = dto.FullName?.Trim();
+        var phone = dto.Phone?.Trim();
+
+        ValidateCreateTicketInput(fullName, phone, dto.PeopleCount);
+
+        var existingActive = await _tickets.GetActiveByPhoneAsync(phone!, ct);
 
         if (existingActive is not null)
         {
@@ -45,15 +50,19 @@ public class TicketService : ITicketService
             return dtoExisting;
         }
 
-        // Ensure service is open
-        var ServiceState = await _serviceStateService.GetAsync(ct);
-        if (!ServiceState.IsOpen)
+        var serviceState = await _serviceStateService.GetAsync(ct);
+        if (!serviceState.IsOpen)
             throw new ServiceClosedException();
 
-        var customer = await _customers.GetByPhoneAsync(dto.Phone, ct);
+        var customer = await _customers.GetByPhoneAsync(phone!, ct);
         if (customer is null)
         {
-            customer = new Customer { FullName = dto.FullName, Phone = dto.Phone };
+            customer = new Customer
+            {
+                FullName = fullName!,
+                Phone = phone!
+            };
+
             await _customers.AddAsync(customer, ct);
             await _customers.SaveChangesAsync(ct);
         }
@@ -70,8 +79,6 @@ public class TicketService : ITicketService
             PublicId = Ulid.NewUlid().ToString()
         };
 
-        //ticket.Customer = customer;
-
         await _tickets.AddAsync(ticket, ct);
         await _tickets.SaveChangesAsync(ct);
         await BroadcastPublicAheadAsync(ct);
@@ -79,10 +86,12 @@ public class TicketService : ITicketService
         var ahead = await _tickets.CountAheadAsync(ticket.Id, ct);
 
         await _notificationService.NotifyTicketCreatedAsync(ticket, ahead, ct);
+
         if (ahead <= 3 && ahead > 1)
         {
             await _notificationService.NotifyTicketUpdatedAsync(ticket, ahead, NotificationType.Reminder, ct);
         }
+
         if (ahead <= 1)
         {
             ticket.Status = TicketStatus.Notified;
@@ -319,5 +328,20 @@ public class TicketService : ITicketService
             IsOpen = true,
             Ahead = active
         }, ct);
+    }
+
+    private static void ValidateCreateTicketInput(string? fullName, string? phone, byte peopleCount)
+    {
+        if (string.IsNullOrWhiteSpace(fullName))
+            throw new ArgumentException("FullName is required.");
+
+        if (string.IsNullOrWhiteSpace(phone))
+            throw new ArgumentException("Phone is required.");
+
+        if (!System.Text.RegularExpressions.Regex.IsMatch(phone, @"^\+[1-9]\d{0,3}\s\d{6,14}$"))
+            throw new ArgumentException("Phone must be in international format, for example +34 608593022.");
+
+        if (peopleCount < 1 || peopleCount > 15)
+            throw new ArgumentException("PeopleCount must be between 1 and 15.");
     }
 }
