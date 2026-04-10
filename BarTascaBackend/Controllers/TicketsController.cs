@@ -123,15 +123,37 @@ public class TicketsController : ControllerBase
         }
     }
 
-    [HttpPut("{id:int}")]    
-    public async Task<ActionResult<TicketDetailDto>> UpdateTicket(int id, [FromBody] UpdateTicketDto dto, CancellationToken ct)
+    [HttpPut("{publicId}/people-count")]
+    [Authorize]
+    public async Task<ActionResult<TicketDetailDto>> UpdateTicket(
+    string publicId,
+    [FromBody] UpdateTicketDto dto,
+    CancellationToken ct)
     {
         if (!ModelState.IsValid) return ValidationProblem(ModelState);
+
+        var isStaff = User.IsInRole("Admin") || User.IsInRole("Worker");
+
+        if (!isStaff)
+        {
+            var claim = User.FindFirstValue("ticket_public_id");
+
+            if (string.IsNullOrWhiteSpace(claim))
+                return Forbid();
+
+            if (!string.Equals(claim, publicId, StringComparison.Ordinal))
+                return Forbid();
+        }
+
         try
         {
-            var result = await _service.UpdateAsync(id, dto, ct);
+            var result = await _service.UpdateByPublicIdAsync(publicId, dto, ct);
             if (result is null) return NotFound();
             return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
         }
         catch (InvalidOperationException ex)
         {

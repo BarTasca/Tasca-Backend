@@ -97,4 +97,13 @@ public interface ITicketService
     /// <returns>Updated ticket details or null if not found.</returns>
     Task<TicketDetailDto?> UpdateAsync(int id, UpdateTicketDto dto, CancellationToken ct = default);
 
+    /// <summary>
+    /// Updates the people count of an active ticket by PublicId.
+    /// </summary>
+    /// <param name="publicId">Ticket PublicId.</param>
+    /// <param name="dto">New people count data.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns></returns>
+    Task<TicketDetailDto?> UpdateByPublicIdAsync(string publicId, UpdateTicketDto dto, CancellationToken ct = default);
+
 }
