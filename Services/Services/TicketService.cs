@@ -306,6 +306,34 @@ public class TicketService : ITicketService
         };
     }
 
+    public async Task<TicketDetailDto?> UpdateAsync(int id, UpdateTicketDto dto, CancellationToken ct = default)
+    {
+        if (dto.PeopleCount < 1 || dto.PeopleCount > 15)
+            throw new ArgumentException("PeopleCount must be between 1 and 15.");
+
+        var ticket = await _tickets.GetByIdAsync(id, ct);
+        if (ticket is null) return null;
+
+        var isActive = ticket.Status == TicketStatus.Waiting || ticket.Status == TicketStatus.Notified;
+        if (!isActive)
+            throw new InvalidOperationException($"Cannot update people count for ticket in status {ticket.Status}");
+
+        if (ticket.PeopleCount != dto.PeopleCount)
+        {
+            ticket.PeopleCount = dto.PeopleCount;
+            _tickets.Update(ticket);
+            await _tickets.SaveChangesAsync(ct);
+        }
+
+        var ahead = await _tickets.CountAheadAsync(ticket.Id, ct);
+        await _notificationService.BroadcastTicketUpdatedAsync(ticket, ahead, ct);
+
+        var result = _mapper.Map<TicketDetailDto>(ticket);
+        result.Ahead = ahead;
+        result.CustomerFullName = string.Empty;
+        return result;
+    }
+
     private async Task BroadcastPublicAheadAsync(CancellationToken ct)
     {
         var state = await _serviceStateService.GetAsync(ct);
