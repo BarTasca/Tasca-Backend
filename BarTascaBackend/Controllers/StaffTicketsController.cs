@@ -80,4 +80,25 @@ public class StaffTicketsController : ControllerBase
             return Conflict(new { error = ex.Message });
         }
     }
+
+    [HttpPut("{id:int}")]
+    public async Task<ActionResult<TicketDetailDto>> UpdateTicket(int id, [FromBody] UpdateTicketDto dto, CancellationToken ct)
+    {
+        if (!ModelState.IsValid) return ValidationProblem(ModelState);
+
+        try
+        {
+            var result = await _service.UpdateAsync(id, dto, ct);
+            if (result is null) return NotFound();
+            return Ok(result);
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { error = ex.Message });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(new { error = ex.Message });
+        }
+    }
 }
