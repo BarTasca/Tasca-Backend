@@ -308,22 +308,41 @@ public class TicketService : ITicketService
 
     public async Task<TicketDetailDto?> UpdateAsync(int id, UpdateTicketDto dto, CancellationToken ct = default)
     {
-        if (dto.PeopleCount < 1 || dto.PeopleCount > 15)
-            throw new ArgumentException("PeopleCount must be between 1 and 15.");
-
         var ticket = await _tickets.GetByIdAsync(id, ct);
         if (ticket is null) return null;
+
+        return await UpdateInternalAsync(ticket, dto, ct);
+    }
+
+    public async Task<TicketDetailDto?> UpdateByPublicIdAsync(string publicId, UpdateTicketDto dto, CancellationToken ct = default)
+    {
+        var ticket = await _tickets.GetByPublicIdAsync(publicId, ct);
+        if (ticket is null) return null;
+
+        return await UpdateInternalAsync(ticket, dto, ct);
+    }
+
+    private async Task<TicketDetailDto> UpdateInternalAsync(Ticket ticket, UpdateTicketDto dto, CancellationToken ct)
+    {
+        if (dto.PeopleCount < 1 || dto.PeopleCount > 15)
+            throw new ArgumentException("PeopleCount must be between 1 and 15.");
 
         var isActive = ticket.Status == TicketStatus.Waiting || ticket.Status == TicketStatus.Notified;
         if (!isActive)
             throw new InvalidOperationException($"Cannot update people count for ticket in status {ticket.Status}");
 
-        if (ticket.PeopleCount != dto.PeopleCount)
+        if (ticket.PeopleCount == dto.PeopleCount)
         {
-            ticket.PeopleCount = dto.PeopleCount;
-            _tickets.Update(ticket);
-            await _tickets.SaveChangesAsync(ct);
+            var aheadSame = await _tickets.CountAheadAsync(ticket.Id, ct);
+            var resultSame = _mapper.Map<TicketDetailDto>(ticket);
+            resultSame.Ahead = aheadSame;
+            resultSame.CustomerFullName = string.Empty;
+            return resultSame;
         }
+
+        ticket.PeopleCount = dto.PeopleCount;
+        _tickets.Update(ticket);
+        await _tickets.SaveChangesAsync(ct);
 
         var ahead = await _tickets.CountAheadAsync(ticket.Id, ct);
         await _notificationService.BroadcastTicketUpdatedAsync(ticket, ahead, ct);
