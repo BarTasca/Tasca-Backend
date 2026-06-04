@@ -1,11 +1,11 @@
 ﻿using AutoMapper;
 using BarTasca.Data.Interfaces;
+using BarTasca.DTOs.Queue;
 using BarTasca.DTOs.Ticket;
 using BarTasca.Models;
-using BarTasca.Services.Interfaces;
 using BarTasca.Services.Exceptions;
+using BarTasca.Services.Interfaces;
 using Microsoft.Extensions.Logging;
-using BarTasca.DTOs.Queue;
 
 namespace BarTasca.Services.Services;
 
@@ -83,7 +83,9 @@ public class TicketService : ITicketService
         await _tickets.SaveChangesAsync(ct);
         await BroadcastPublicAheadAsync(ct);
 
-        var ahead = await _tickets.CountAheadAsync(ticket.Id, ct);
+        var ordered = await _tickets.ListActiveOrderedAsync(ct);
+        var aheadMap = CalculateAheadMap(ordered);
+        var ahead = aheadMap[ticket.Id];
 
         await _notificationService.NotifyTicketCreatedAsync(ticket, ahead, ct);
 
@@ -112,7 +114,7 @@ public class TicketService : ITicketService
         var ticket = await _tickets.GetByIdAsync(id, ct);
         if (ticket is null) return null;
 
-        var ahead = await _tickets.CountAheadAsync(ticket.Id, ct);
+        var ahead = await GetWeightedAheadAsync(ticket.Id, ct);
         var dto = _mapper.Map<TicketDetailDto>(ticket);
         dto.Ahead = ahead;
         dto.CustomerFullName = string.Empty;
@@ -164,6 +166,9 @@ public class TicketService : ITicketService
         var ticket = await _tickets.GetByIdAsync(id, ct);
         if (ticket is null) return null;
 
+        var beforeList = await _tickets.ListActiveOrderedAsync(ct);
+        var beforeMap = CalculateAheadMap(beforeList);
+
         bool wasActive = ticket.Status == TicketStatus.Waiting || ticket.Status == TicketStatus.Notified;
         bool becomesInactive = target == TicketStatus.Confirmed || target == TicketStatus.Skipped || target == TicketStatus.Cancelled;
 
@@ -176,6 +181,7 @@ public class TicketService : ITicketService
         {
             ticket.Status = target;
             if (setConfirmedAt) ticket.ConfirmedAt = DateTime.UtcNow;
+
             _tickets.Update(ticket);
             await _tickets.SaveChangesAsync(ct);
 
@@ -186,25 +192,31 @@ public class TicketService : ITicketService
 
             if (wasActive && becomesInactive)
             {
-                await _pushSubs.DeactivateByTicketIdAsync(ticket.Id, ct);
                 await BroadcastPublicAheadAsync(ct);
             }
         }
 
-        var aheadSelf = await _tickets.CountAheadAsync(ticket.Id, ct);
+        var afterList = await _tickets.ListActiveOrderedAsync(ct);
+        var afterMap = CalculateAheadMap(afterList);
+
+        var aheadSelf = afterMap.TryGetValue(ticket.Id, out var selfAheadAfter)
+            ? selfAheadAfter
+            : 0;
+
         await _notificationService.BroadcastTicketUpdatedAsync(ticket, aheadSelf, ct);
 
-        var affected = await _tickets.ListActiveBehindAsync(ticket.Position, 500, ct);
+        var affected = afterList.Where(t => t.Position > ticket.Position).ToList();
+
         foreach (var a in affected)
         {
-            var afterAhead = await _tickets.CountAheadAsync(a.Id, ct);
-            var previousAhead = afterAhead + 1;
+            var beforeAhead = beforeMap.TryGetValue(a.Id, out var beforeValue) ? beforeValue : 0;
+            var afterAhead = afterMap.TryGetValue(a.Id, out var afterValue) ? afterValue : 0;
 
-            if (previousAhead > 3 && afterAhead == 3)
+            if (beforeAhead > 3 && afterAhead == 3)
             {
                 await _notificationService.NotifyTicketUpdatedAsync(a, afterAhead, NotificationType.Reminder, ct);
             }
-            else if (previousAhead > 1 && afterAhead <= 1)
+            else if (beforeAhead > 1 && afterAhead <= 1)
             {
                 var toUpdate = await _tickets.GetByIdAsync(a.Id, ct);
                 if (toUpdate is not null)
@@ -217,11 +229,11 @@ public class TicketService : ITicketService
                         await _tickets.SaveChangesAsync(ct);
                     }
 
-                    var finalAhead = await _tickets.CountAheadAsync(toUpdate.Id, ct);
+                    var finalAhead = await GetWeightedAheadAsync(toUpdate.Id, ct);
                     await _notificationService.NotifyTicketUpdatedAsync(toUpdate, finalAhead, NotificationType.Turn, ct);
                 }
             }
-            else
+            else if (beforeAhead != afterAhead)
             {
                 await _notificationService.BroadcastTicketUpdatedAsync(a, afterAhead, ct);
             }
@@ -243,7 +255,7 @@ public class TicketService : ITicketService
 
         if (ticket.Status == TicketStatus.Notified && !force)
         {
-            var ahead0 = await _tickets.CountAheadAsync(ticket.Id, ct);
+            var ahead0 = await GetWeightedAheadAsync(ticket.Id, ct);
             var dto0 = _mapper.Map<TicketDetailDto>(ticket);
             dto0.Ahead = ahead0;
             dto0.CustomerFullName = string.Empty;
@@ -256,7 +268,7 @@ public class TicketService : ITicketService
         _tickets.Update(ticket);
         await _tickets.SaveChangesAsync(ct);
 
-        var ahead = await _tickets.CountAheadAsync(ticket.Id, ct);
+        var ahead = await GetWeightedAheadAsync(ticket.Id, ct);
         await _notificationService.NotifyTicketUpdatedAsync(ticket, ahead, NotificationType.Manual, ct);
 
         var dto = _mapper.Map<TicketDetailDto>(ticket);
@@ -270,7 +282,7 @@ public class TicketService : ITicketService
         var ticket = await _tickets.GetByPublicIdAsync(publicId, ct);
         if (ticket is null) return null;
 
-        var ahead = await _tickets.CountAheadAsync(ticket.Id, ct);
+        var ahead = await GetWeightedAheadAsync(ticket.Id, ct);
 
         return new TicketStatusDto
         {
@@ -297,7 +309,7 @@ public class TicketService : ITicketService
             };
         }
 
-        var ahead = await _tickets.CountActiveAsync(ct);
+        var ahead = await GetWeightedActiveCountAsync(ct);
 
         return new QueueAheadDto
         {
@@ -331,9 +343,14 @@ public class TicketService : ITicketService
         if (!isActive)
             throw new InvalidOperationException($"Cannot update people count for ticket in status {ticket.Status}");
 
+        var beforeList = await _tickets.ListActiveOrderedAsync(ct);
+        var beforeMap = CalculateAheadMap(beforeList);
+        var oldWeight = GetWeight(ticket);
+
         if (ticket.PeopleCount == dto.PeopleCount)
         {
-            var aheadSame = await _tickets.CountAheadAsync(ticket.Id, ct);
+            var aheadSame = beforeMap.TryGetValue(ticket.Id, out var sameAhead) ? sameAhead : 0;
+
             var resultSame = _mapper.Map<TicketDetailDto>(ticket);
             resultSame.Ahead = aheadSame;
             resultSame.CustomerFullName = string.Empty;
@@ -341,11 +358,34 @@ public class TicketService : ITicketService
         }
 
         ticket.PeopleCount = dto.PeopleCount;
+        var newWeight = GetWeight(ticket);
+
         _tickets.Update(ticket);
         await _tickets.SaveChangesAsync(ct);
 
-        var ahead = await _tickets.CountAheadAsync(ticket.Id, ct);
+        var afterList = await _tickets.ListActiveOrderedAsync(ct);
+        var afterMap = CalculateAheadMap(afterList);
+
+        var ahead = afterMap.TryGetValue(ticket.Id, out var selfAhead) ? selfAhead : 0;
         await _notificationService.BroadcastTicketUpdatedAsync(ticket, ahead, ct);
+
+        if (oldWeight != newWeight)
+        {
+            var affected = afterList.Where(t => t.Position > ticket.Position);
+
+            foreach (var a in affected)
+            {
+                var beforeAhead = beforeMap.TryGetValue(a.Id, out var beforeValue) ? beforeValue : 0;
+                var afterAhead = afterMap.TryGetValue(a.Id, out var afterValue) ? afterValue : 0;
+
+                if (beforeAhead != afterAhead)
+                {
+                    await _notificationService.BroadcastTicketUpdatedAsync(a, afterAhead, ct);
+                }
+            }
+
+            await BroadcastPublicAheadAsync(ct);
+        }
 
         var result = _mapper.Map<TicketDetailDto>(ticket);
         result.Ahead = ahead;
@@ -368,7 +408,7 @@ public class TicketService : ITicketService
             return;
         }
 
-        var active = await _tickets.CountActiveAsync(ct);
+        var active = await GetWeightedActiveCountAsync(ct);
 
         await _publicSignalR.BroadcastAheadUpdatedAsync(new QueueAheadDto
         {
@@ -390,5 +430,71 @@ public class TicketService : ITicketService
 
         if (peopleCount < 1 || peopleCount > 15)
             throw new ArgumentException("PeopleCount must be between 1 and 15.");
+    }
+
+    /// <summary>
+    /// Calculates the weight of a ticket based on the number of people. Tickets with 8 or more people count as 2, otherwise 1.
+    /// </summary>
+    /// <param name="ticket">Ticket to calculate weight for.</param>
+    /// <returns>Weight of the ticket.</returns>
+    private static int GetWeight(Ticket ticket)
+    {
+        return ticket.PeopleCount >= 8 ? 2 : 1;
+    }
+
+    /// <summary>
+    /// Calculates the total weight of tickets ahead of the target ticket in the ordered list. It iterates through the list until it finds the target ticket, summing the weights of the tickets it encounters. Once it reaches the target ticket, it stops and returns the total weight calculated. This method assumes that the 'ordered' list is sorted by position in ascending order.
+    /// </summary>
+    /// <param name="ordered">List of tickets ordered by position.</param>
+    /// <param name="targetTicketId">Id of the target ticket to calculate ahead for.</param>
+    /// <returns>Total weight of tickets ahead of the target ticket.</returns>
+    private static int CalculateAhead(IReadOnlyList<Ticket> ordered, int targetTicketId)
+    {
+        int ahead = 0;
+
+        foreach (var t in ordered)
+        {
+            if (t.Id == targetTicketId) break;
+
+            ahead += GetWeight(t);
+        }
+        return ahead;
+    }
+
+    /// <summary>
+    /// Calculates a map of ticket IDs to their ahead counts based on the ordered list of tickets. It iterates through the ordered list, maintaining a running total of the weight of tickets encountered so far. For each ticket, it stores the current total weight in the result dictionary using the ticket's ID as the key. After processing all tickets, it returns the dictionary containing the ahead counts for each ticket ID. This method assumes that the 'ordered' list is sorted by position in ascending order.
+    /// </summary>
+    /// <param name="ordered">List of tickets ordered by position.</param>
+    /// <returns>Dictionary mapping ticket IDs to their ahead counts.</returns>
+    private static Dictionary<int, int> CalculateAheadMap(IReadOnlyList<Ticket> ordered)
+    {
+        var result = new Dictionary<int, int>();
+        int ahead = 0;
+        foreach (var t in ordered)
+        {
+            result[t.Id] = ahead;
+            ahead += GetWeight(t);
+        }
+        return result;
+    }
+
+    /// <summary>
+    /// Calculates the weighted number of tickets ahead of the specified ticket by first retrieving the ordered list of active tickets, then creating a map of ticket IDs to their ahead counts using the CalculateAheadMap method, and finally returning the ahead count for the specified ticket ID from the map. If the ticket ID is not found in the map, it returns 0. This method provides a more efficient way to get the ahead count for a specific ticket by avoiding repeated calculations for each ticket when multiple ahead counts are needed.
+    /// </summary>
+    /// <param name="ticketId">Id of the ticket to calculate ahead for.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>Weighted number of tickets ahead of the specified ticket.</returns>
+    private async Task<int> GetWeightedAheadAsync(int ticketId, CancellationToken ct)
+    {
+        var ordered = await _tickets.ListActiveOrderedAsync(ct);
+        var aheadMap = CalculateAheadMap(ordered);
+
+        return aheadMap.TryGetValue(ticketId, out var ahead) ? ahead : 0;
+    }
+
+    private async Task<int> GetWeightedActiveCountAsync(CancellationToken ct)
+    {
+        var ordered = await _tickets.ListActiveOrderedAsync(ct);
+        return ordered.Sum(GetWeight);
     }
 }

@@ -36,6 +36,13 @@ public interface ITicketRepository
     Task<int> CountAheadAsync(int ticketId, CancellationToken ct = default);
 
     /// <summary>
+    /// Lists active tickets (Waiting/Notified) ordered by position.
+    /// </summary>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>List of active tickets ordered by position.</returns>
+    Task<List<Ticket>> ListActiveOrderedAsync(CancellationToken ct = default);
+
+    /// <summary>
     /// Adds a new ticket.
     /// </summary>
     /// <param name="ticket">Ticket to add.</param>

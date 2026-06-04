@@ -46,6 +46,13 @@ public class TicketRepository : ITicketRepository
             .CountAsync(ct);
     }
 
+    public Task<List<Ticket>> ListActiveOrderedAsync(CancellationToken ct = default)
+    => _db.Tickets
+        .AsNoTracking()
+        .Where(t => t.Status == TicketStatus.Waiting || t.Status == TicketStatus.Notified)
+        .OrderBy(t => t.Position)
+        .ToListAsync(ct);
+
     public Task AddAsync(Ticket ticket, CancellationToken ct = default)
         => _db.Tickets.AddAsync(ticket, ct).AsTask();
 
