@@ -26,4 +26,14 @@ public class CustomerRepository : ICustomerRepository
               .OrderBy(c => c.Id)
               .Take(take)
               .ToListAsync(ct);
+
+    public async Task UpdateNameAsync(int id, string newName, CancellationToken ct = default)
+    {
+        var customer = await _db.Customers.FindAsync(new object[] { id }, ct);
+        if (customer != null)
+        {
+            customer.FullName = newName;
+            await _db.SaveChangesAsync(ct);
+        }
+    }
 }

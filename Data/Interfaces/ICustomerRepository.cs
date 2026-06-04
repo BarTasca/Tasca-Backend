@@ -29,6 +29,8 @@ public interface ICustomerRepository
     /// <returns>The number of state entries written to the database.</returns>
     Task<int> SaveChangesAsync(CancellationToken ct = default);
 
+    Task UpdateNameAsync(int id, string newName, CancellationToken ct = default);
+
     /// <summary>
     /// Lists customers eligible for anonymization.
     /// </summary>

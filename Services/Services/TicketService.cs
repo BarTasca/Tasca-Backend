@@ -66,6 +66,13 @@ public class TicketService : ITicketService
             await _customers.AddAsync(customer, ct);
             await _customers.SaveChangesAsync(ct);
         }
+        else if (customer.FullName != fullName)
+        {
+            customer.FullName = fullName!;
+
+            await _customers.UpdateNameAsync(customer.Id, fullName!, ct);
+            await _customers.SaveChangesAsync(ct);
+        }
 
         var maxWaiting = await _tickets.GetMaxWaitingPositionAsync(ct);
         var newPosition = maxWaiting + 1;
