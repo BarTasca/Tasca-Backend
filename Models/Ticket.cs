@@ -22,6 +22,7 @@ namespace BarTasca.Models
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
         public DateTime? ConfirmedAt { get; set; }
         public DateTime? NotifiedAt { get; set; }
+        public DateTime? CancelledAt { get; set; }
 
         public ICollection<Notification> Notifications { get; set; } = new List<Notification>();
 
