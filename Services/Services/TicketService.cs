@@ -164,6 +164,9 @@ public class TicketService : ITicketService
             Position = t.Position,
             Status = t.Status.ToString(),
             CreatedAt = t.CreatedAt,
+            ConfirmedAt = t.ConfirmedAt,
+            NotifiedAt = t.NotifiedAt,
+            CancelledAt = t.CancelledAt,
             CustomerFullName = t.Customer.FullName
         }).ToList();
     }
