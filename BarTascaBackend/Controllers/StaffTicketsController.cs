@@ -15,7 +15,7 @@ public class StaffTicketsController : ControllerBase
     public StaffTicketsController(ITicketService service) => _service = service;
 
     [HttpGet]
-    public async Task<ActionResult<IReadOnlyList<TicketStaffListDto>>> List([FromQuery] string status = "active", [FromQuery] int take = 20, CancellationToken ct = default)
+    public async Task<ActionResult<IReadOnlyList<TicketStaffListDto>>> List([FromQuery] string status = "active", [FromQuery] int? take = null, CancellationToken ct = default)
     {
         var list = await _service.ListForStaffAsync(status, take, ct);
         return Ok(list);

@@ -54,7 +54,7 @@ public interface ITicketService
     /// <param name="take">Maximum number of tickets to return.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>List of tickets for staff.</returns>
-    Task<IReadOnlyList<TicketStaffListDto>> ListForStaffAsync(string status = "active", int take = 100, CancellationToken ct = default);
+    Task<IReadOnlyList<TicketStaffListDto>> ListForStaffAsync(string status = "active", int? take = null, CancellationToken ct = default);
 
     /// <summary>
     /// Notifies the customer of a ticket, optionally forcing the notification.

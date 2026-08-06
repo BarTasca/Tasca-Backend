@@ -61,14 +61,18 @@ public class TicketRepository : ITicketRepository
     public Task<int> SaveChangesAsync(CancellationToken ct = default)
         => _db.SaveChangesAsync(ct);
 
-    public Task<List<Ticket>> ListByStatusesAsync(TicketStatus[] statuses, int take, CancellationToken ct = default)
-        => _db.Tickets
+    public Task<List<Ticket>> ListByStatusesAsync(TicketStatus[] statuses, int? take = null, CancellationToken ct = default)
+    {
+        IQueryable<Ticket> query = _db.Tickets
               .AsNoTracking()
               .Include(t => t.Customer)
               .Where(t => statuses.Contains(t.Status))
-              .OrderBy(t => t.Position)
-              .Take(take)
-              .ToListAsync(ct);
+              .OrderBy(t => t.Position);
+
+        if (take.HasValue) query = query.Take(take.Value);
+
+        return query.ToListAsync(ct);
+    }
 
     public Task<List<Ticket>> ListActiveBehindAsync(int position, int take, CancellationToken ct = default)
         => _db.Tickets

@@ -145,7 +145,7 @@ public class TicketService : ITicketService
         return await CancelAsync(ticket.Id, ct);
     }
 
-    public async Task<IReadOnlyList<TicketStaffListDto>> ListForStaffAsync(string status = "active", int take = 20, CancellationToken ct = default)
+    public async Task<IReadOnlyList<TicketStaffListDto>> ListForStaffAsync(string status = "active", int? take = null, CancellationToken ct = default)
     {
         var statuses = status.ToLowerInvariant() switch
         {
