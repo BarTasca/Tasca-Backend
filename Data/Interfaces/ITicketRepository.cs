@@ -21,6 +21,15 @@ public interface ITicketRepository
     Task<Ticket?> GetActiveByPhoneAsync(string phone, CancellationToken ct = default);
 
     /// <summary>
+    /// Checks whether an active ticket (Waiting/Notified) exists for a customer whose full name
+    /// matches the given name, ignoring case, diacritics and surrounding whitespace.
+    /// </summary>
+    /// <param name="fullName">Full name to compare, as entered by the user.</param>
+    /// <param name="ct">Cancellation token.</param>
+    /// <returns>True if an active ticket with an equivalent name exists; otherwise, false.</returns>
+    Task<bool> ExistsActiveByNormalizedNameAsync(string fullName, CancellationToken ct = default);
+
+    /// <summary>
     /// Gets the maximum position among tickets with Waiting status.
     /// </summary>
     /// <param name="ct">Cancellation token.</param>

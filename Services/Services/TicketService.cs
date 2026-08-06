@@ -54,6 +54,9 @@ public class TicketService : ITicketService
         if (!serviceState.IsOpen)
             throw new ServiceClosedException();
 
+        if (await _tickets.ExistsActiveByNormalizedNameAsync(fullName!, ct))
+            throw new DuplicateActiveTicketNameException();
+
         var customer = await _customers.GetByPhoneAsync(phone!, ct);
         if (customer is null)
         {
