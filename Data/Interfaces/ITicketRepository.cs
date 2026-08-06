@@ -66,10 +66,10 @@ public interface ITicketRepository
     /// Lists tickets by their statuses.
     /// </summary>
     /// <param name="statuses">Array of ticket statuses.</param>
-    /// <param name="take">Maximum number of tickets to return.</param>
+    /// <param name="take">Maximum number of tickets to return, or null to return all matching tickets.</param>
     /// <param name="ct">Cancellation token.</param>
     /// <returns>List of tickets matching the statuses.</returns>
-    Task<List<Ticket>> ListByStatusesAsync(TicketStatus[] statuses, int take = 100, CancellationToken ct = default);
+    Task<List<Ticket>> ListByStatusesAsync(TicketStatus[] statuses, int? take = null, CancellationToken ct = default);
 
     /// <summary>
     /// Lists active tickets (Waiting/Notified) behind a certain position.
