@@ -45,6 +45,10 @@ public class TicketsController : ControllerBase
         {
             return Conflict(new { code = "SERVICE_CLOSED" });
         }
+        catch (DuplicateActiveTicketNameException ex)
+        {
+            return Conflict(new { code = "DUPLICATE_NAME", error = ex.Message });
+        }
     }
 
     [HttpGet("{id:int}")]

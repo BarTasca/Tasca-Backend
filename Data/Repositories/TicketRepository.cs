@@ -1,4 +1,6 @@
-﻿using BarTasca.Data.Interfaces;
+﻿using System.Globalization;
+using System.Text;
+using BarTasca.Data.Interfaces;
 using BarTasca.Models;
 using Microsoft.EntityFrameworkCore;
 
@@ -22,6 +24,37 @@ public class TicketRepository : ITicketRepository
                           (t.Status == TicketStatus.Waiting || t.Status == TicketStatus.Notified))
               .OrderBy(t => t.Position)
               .FirstOrDefaultAsync(ct);
+
+    public async Task<bool> ExistsActiveByNormalizedNameAsync(string fullName, CancellationToken ct = default)
+    {
+        var normalizedTarget = NormalizeName(fullName);
+
+        var activeNames = await _db.Tickets
+              .AsNoTracking()
+              .Where(t => t.Status == TicketStatus.Waiting || t.Status == TicketStatus.Notified)
+              .Select(t => t.Customer.FullName)
+              .ToListAsync(ct);
+
+        return activeNames.Any(name => NormalizeName(name) == normalizedTarget);
+    }
+
+    // MySQL collation cannot be relied on to strip accents consistently across environments,
+    // and Normalize()/diacritics removal cannot be translated to SQL by the EF provider, so the
+    // comparison is done in memory over the (small) set of currently active tickets.
+    private static string NormalizeName(string value)
+    {
+        var trimmed = value.Trim();
+        var decomposed = trimmed.Normalize(NormalizationForm.FormD);
+
+        var sb = new StringBuilder(decomposed.Length);
+        foreach (var c in decomposed)
+        {
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                sb.Append(c);
+        }
+
+        return sb.ToString().Normalize(NormalizationForm.FormC).ToUpperInvariant();
+    }
 
     public async Task<int> GetMaxWaitingPositionAsync(CancellationToken ct = default)
     {
